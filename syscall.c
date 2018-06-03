@@ -19,7 +19,10 @@ fetchint(uint addr, int *ip)
 {
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->sz || addr+4 > curproc->sz)
+  // Check if addr is valid.
+  if ((addr >= curproc->sz && addr < curproc->tf->esp) ||
+      (addr + 4 > curproc->sz && addr < curproc->tf->esp) ||
+      addr + 4 > USERTOP)
     return -1;
   *ip = *(int*)(addr);
   return 0;
@@ -34,10 +37,17 @@ fetchstr(uint addr, char **pp)
   char *s, *ep;
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->sz)
+  if ((addr >= curproc->sz && addr < curproc->tf->esp) || (addr > USERTOP))
     return -1;
-  *pp = (char*)addr;
-  ep = (char*)curproc->sz;
+  *pp = (char *)addr;
+
+  if (addr < curproc->sz)
+    ep = (char *)curproc->sz;
+  else if (addr >= curproc->tf->esp && addr < USERTOP)
+    ep = (char *)USERTOP;
+  else
+    return -1;
+
   for(s = *pp; s < ep; s++){
     if(*s == 0)
       return s - *pp;
@@ -63,9 +73,15 @@ argptr(int n, char **pp, int size)
  
   if(argint(n, &i) < 0)
     return -1;
-  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
+  if ((uint)i < PGSIZE || // Null pointer protection.
+      (uint)i > USERTOP ||
+      ((uint)i >= curproc->sz && (uint)i < USERTOP - curproc->stack_size) ||
+      ((uint)(i + size) > curproc->sz && i + size < USERTOP - curproc->stack_size) ||
+      (uint)(i + size) > USERTOP ||
+      (((uint)i < curproc->sz) && (uint)(i + size) >= USERTOP - curproc->stack_size))
     return -1;
-  *pp = (char*)i;
+
+  *pp = (char *)i;
   return 0;
 }
 
@@ -103,6 +119,7 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_nfpgs(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,6 +143,7 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_nfpgs]   sys_nfpgs,
 };
 
 void

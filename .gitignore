@@ -14,3 +14,11 @@ kernel
 kernelmemfs
 mkfs
 .gdbinit
+
+
+mem.txt
+notes.md
+.idea
+CMakeLists.txt
+cmake-build-debug
+.vscode
