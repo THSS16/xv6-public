@@ -533,27 +533,17 @@ procdump(void)
   }
 }
 
-// Make parentpid become pid's parent
+// Make init become the proc's parent (specified by pid)
 void 
-reparent(int pid,int parentpid)
+reparent(int pid)
 {
   struct proc *p;
-  struct proc *parent = 0;
 
   acquire(&ptable.lock);
 
   for (p = ptable.proc; p < &ptable.proc[NPROC];p++){
-    if(p->pid == parentpid)
-      parent = p;
-  }
-  if(parent == 0){
-    release(&ptable.lock);
-    return;
-  }
-
-  for (p = ptable.proc; p < &ptable.proc[NPROC];p++){
     if(p->pid == pid){
-      p->parent = parent;
+      myproc()->parent = p;
       release(&ptable.lock);
       return;
     }

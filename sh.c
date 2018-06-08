@@ -174,7 +174,7 @@ runcmd(struct cmd *cmd)
   case BACK:
     bcmd = (struct backcmd*)cmd;
     if(fork1() == 0){
-      reparent(getpid(), 2);
+      reparent(getpid(),2);
       runcmd(bcmd->cmd);
     }
     break;
