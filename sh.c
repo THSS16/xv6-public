@@ -123,8 +123,10 @@ runcmd(struct cmd *cmd)
 
   case BACK:
     bcmd = (struct backcmd*)cmd;
-    if(fork1() == 0)
+    if(fork1() == 0){
+      reparent(2);
       runcmd(bcmd->cmd);
+    }
     break;
   }
   exit();
