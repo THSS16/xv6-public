@@ -1,5 +1,4 @@
 struct stat;
-struct rtcdate;
 
 // system calls
 int fork(void);
@@ -23,6 +22,23 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+
+void paintWindow(void *, int, int, void *, int, int, int, int);
+void registWindow(void *);
+void destroyWindow(void *);
+void sendMessage(int, void *);
+void getMessage(void *);
+void setTimer(void *, int, int);
+void killTimer(void *, int);
+void initStringFigure(void *, int, void *, int);
+void getStringFigure(void *, void *, int);
+uint getTime();
+uint getdate();
+void setCursor(void *);
+void flushRect(int, int, int, int);
+void resetWindow(void *, int);
+void getWindowInfo(int, void *);
+void directPaintWindow(void *, int, int, void *, int, int, int, int);
 
 // ulib.c
 int stat(char*, struct stat*);

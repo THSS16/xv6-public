@@ -20,3 +20,20 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
+
+#define SYS_paintWindow   22
+#define SYS_registWindow 23
+#define SYS_sendMessage 24
+#define SYS_getMessage 25
+#define SYS_setTimer 26
+#define SYS_destroyWindow 27
+#define SYS_killTimer 28
+#define SYS_initStringFigure 29
+#define SYS_getStringFigure 30
+#define SYS_getTime 31
+#define SYS_getDate 32
+#define SYS_setCursor 33
+#define SYS_flushRect 34
+#define SYS_resetWindow 35
+#define SYS_getWindowInfo 36
+#define SYS_directPaintWindow 37
