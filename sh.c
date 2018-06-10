@@ -65,8 +65,11 @@ bg()
 {
   int cachefd;
   int forkid;
-  if(lastcmd[lastcmd_pointer][0] = 0)
+  char *now = lastcmd[lastcmd_pointer];
+  now[strlen(now) - 1] = 0;
+  if(lastcmd[lastcmd_pointer][0] == 0)
     printf(2, "No current job\n");
+ 
   printf(1, "%s &\n", lastcmd[lastcmd_pointer]);
   cachefd = open(FILENAME, O_WRONLY);
   if (cachefd < 0)
@@ -83,9 +86,9 @@ bg()
     if (cachefd < 0)
       printf(2, "Cannot open processinfo");
     else
-      printf(cachefd, "%d %s\n", forkid);
+      printf(cachefd, "%d %s\n", forkid,lastcmd[lastcmd_pointer]);
   }
-  return;
+exit();
 }
 
 //Run fg
@@ -97,8 +100,8 @@ fg(char* s)
   while('0' <= *s && *s <= '9')
     fgid = fgid*10 + *s++ - '0';
 
-
-
+  reparent(fgid,getpid());
+  wait();
 }
 // Execute cmd.  Never returns.
 void

@@ -33,11 +33,7 @@ int main(void)
     close(fd);*/
 
     fd = open(FILENAME, O_RDONLY);
-    if(fd >= 0) 
-    {
-        printf(1, "ok: open file succeed\n");
-    } 
-    else 
+    if(fd < 0) 
     {
         printf(1, "error: open file failed\n");
         exit();
