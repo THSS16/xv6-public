@@ -92,7 +92,9 @@ fg(char* s)
   fgid = 0;
   while('0' <= *s && *s <= '9')
     fgid = fgid*10 + *s++ - '0';
-  
+
+  int fgpid = 0;
+
 
 }
 // Execute cmd.  Never returns.
