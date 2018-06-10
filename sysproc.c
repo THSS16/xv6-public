@@ -104,3 +104,19 @@ sys_reparent(void)
   reparent(pid,parent);
   return 0;
 }
+
+int 
+sys_getstate(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+
+  return getstate(pid);
+}
+int
+sys_suspend(void)
+{
+  return suspend();
+}

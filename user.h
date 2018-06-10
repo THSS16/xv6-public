@@ -25,6 +25,8 @@ int sleep(int);
 int uptime(void);
 int reparent(int,int);
 void jobs (void);
+int getstate(int);
+int suspend(int);
 
 // ulib.c
 int stat(char*, struct stat*);

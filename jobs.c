@@ -2,6 +2,7 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
+#include "jobsconst.h"
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
@@ -31,7 +32,7 @@ int main(void)
     
     close(fd);*/
 
-    fd = open("processInfo", O_RDONLY);
+    fd = open(FILENAME, O_RDONLY);
     if(fd >= 0) 
     {
         printf(1, "ok: open file succeed\n");
@@ -61,11 +62,10 @@ int main(void)
             printf(1, " ");
 
             pos = partition(line, res, pos);
-            //int pid = atoi(res);
+            int pid = atoi(res);
             
-            //to change
-            int state = UNUSED;//getStateByPid(pid);
-            
+            int state = getstate(pid);
+
             switch(state)
             {
                 case UNUSED: printf(1,"UNUSED\n"); break;

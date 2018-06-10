@@ -561,3 +561,29 @@ reparent(int pid,int parentpid)
   release(&ptable.lock);
   return;
 }
+
+//Get pid's current running state
+int
+getstate(int pid)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      release(&ptable.lock);
+      return p->state;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+//Suspend current foreground process
+int
+suspend(void)
+{
+  struct proc *p = myproc();
+  cprintf("\nCtrl+C detected\n");
+  return kill(p->pid);
+}
