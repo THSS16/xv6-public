@@ -11,8 +11,6 @@
 #include "mmu.h"
 #include "proc.h"
 #include "fs.h"
-#include "spinlock.h"
-#include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
 
@@ -26,7 +24,7 @@ argfd(int n, int *pfd, struct file **pf)
 
   if(argint(n, &fd) < 0)
     return -1;
-  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+  if(fd < 0 || fd >= NOFILE || (f=proc->ofile[fd]) == 0)
     return -1;
   if(pfd)
     *pfd = fd;
@@ -41,11 +39,10 @@ static int
 fdalloc(struct file *f)
 {
   int fd;
-  struct proc *curproc = myproc();
 
   for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd] == 0){
-      curproc->ofile[fd] = f;
+    if(proc->ofile[fd] == 0){
+      proc->ofile[fd] = f;
       return fd;
     }
   }
@@ -57,7 +54,7 @@ sys_dup(void)
 {
   struct file *f;
   int fd;
-
+  
   if(argfd(0, 0, &f) < 0)
     return -1;
   if((fd=fdalloc(f)) < 0)
@@ -95,10 +92,10 @@ sys_close(void)
 {
   int fd;
   struct file *f;
-
+  
   if(argfd(0, &fd, &f) < 0)
     return -1;
-  myproc()->ofile[fd] = 0;
+  proc->ofile[fd] = 0;
   fileclose(f);
   return 0;
 }
@@ -108,7 +105,7 @@ sys_fstat(void)
 {
   struct file *f;
   struct stat *st;
-
+  
   if(argfd(0, 0, &f) < 0 || argptr(1, (void*)&st, sizeof(*st)) < 0)
     return -1;
   return filestat(f, st);
@@ -123,17 +120,15 @@ sys_link(void)
 
   if(argstr(0, &old) < 0 || argstr(1, &new) < 0)
     return -1;
-
-  begin_op();
-  if((ip = namei(old)) == 0){
-    end_op();
+  if((ip = namei(old)) == 0)
     return -1;
-  }
+
+  begin_trans();
 
   ilock(ip);
   if(ip->type == T_DIR){
     iunlockput(ip);
-    end_op();
+    commit_trans();
     return -1;
   }
 
@@ -151,7 +146,7 @@ sys_link(void)
   iunlockput(dp);
   iput(ip);
 
-  end_op();
+  commit_trans();
 
   return 0;
 
@@ -160,7 +155,7 @@ bad:
   ip->nlink--;
   iupdate(ip);
   iunlockput(ip);
-  end_op();
+  commit_trans();
   return -1;
 }
 
@@ -191,12 +186,10 @@ sys_unlink(void)
 
   if(argstr(0, &path) < 0)
     return -1;
-
-  begin_op();
-  if((dp = nameiparent(path, name)) == 0){
-    end_op();
+  if((dp = nameiparent(path, name)) == 0)
     return -1;
-  }
+
+  begin_trans();
 
   ilock(dp);
 
@@ -228,13 +221,13 @@ sys_unlink(void)
   iupdate(ip);
   iunlockput(ip);
 
-  end_op();
+  commit_trans();
 
   return 0;
 
 bad:
   iunlockput(dp);
-  end_op();
+  commit_trans();
   return -1;
 }
 
@@ -293,24 +286,18 @@ sys_open(void)
 
   if(argstr(0, &path) < 0 || argint(1, &omode) < 0)
     return -1;
-
-  begin_op();
-
   if(omode & O_CREATE){
+    begin_trans();
     ip = create(path, T_FILE, 0, 0);
-    if(ip == 0){
-      end_op();
+    commit_trans();
+    if(ip == 0)
       return -1;
-    }
   } else {
-    if((ip = namei(path)) == 0){
-      end_op();
+    if((ip = namei(path)) == 0)
       return -1;
-    }
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
-      end_op();
       return -1;
     }
   }
@@ -319,11 +306,9 @@ sys_open(void)
     if(f)
       fileclose(f);
     iunlockput(ip);
-    end_op();
     return -1;
   }
   iunlock(ip);
-  end_op();
 
   f->type = FD_INODE;
   f->ip = ip;
@@ -339,13 +324,13 @@ sys_mkdir(void)
   char *path;
   struct inode *ip;
 
-  begin_op();
+  begin_trans();
   if(argstr(0, &path) < 0 || (ip = create(path, T_DIR, 0, 0)) == 0){
-    end_op();
+    commit_trans();
     return -1;
   }
   iunlockput(ip);
-  end_op();
+  commit_trans();
   return 0;
 }
 
@@ -354,18 +339,19 @@ sys_mknod(void)
 {
   struct inode *ip;
   char *path;
+  int len;
   int major, minor;
-
-  begin_op();
-  if((argstr(0, &path)) < 0 ||
+  
+  begin_trans();
+  if((len=argstr(0, &path)) < 0 ||
      argint(1, &major) < 0 ||
      argint(2, &minor) < 0 ||
      (ip = create(path, T_DEV, major, minor)) == 0){
-    end_op();
+    commit_trans();
     return -1;
   }
   iunlockput(ip);
-  end_op();
+  commit_trans();
   return 0;
 }
 
@@ -374,23 +360,17 @@ sys_chdir(void)
 {
   char *path;
   struct inode *ip;
-  struct proc *curproc = myproc();
-  
-  begin_op();
-  if(argstr(0, &path) < 0 || (ip = namei(path)) == 0){
-    end_op();
+
+  if(argstr(0, &path) < 0 || (ip = namei(path)) == 0)
     return -1;
-  }
   ilock(ip);
   if(ip->type != T_DIR){
     iunlockput(ip);
-    end_op();
     return -1;
   }
   iunlock(ip);
-  iput(curproc->cwd);
-  end_op();
-  curproc->cwd = ip;
+  iput(proc->cwd);
+  proc->cwd = ip;
   return 0;
 }
 
@@ -434,7 +414,7 @@ sys_pipe(void)
   fd0 = -1;
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
     if(fd0 >= 0)
-      myproc()->ofile[fd0] = 0;
+      proc->ofile[fd0] = 0;
     fileclose(rf);
     fileclose(wf);
     return -1;
