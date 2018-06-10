@@ -52,6 +52,7 @@ struct backcmd {
 int fork1(void);  // Fork but panics on failure.
 void panic(char*);
 struct cmd *parsecmd(char*);
+void runcmd(struct cmd*);
 
 //cache for last cmd
 char lastcmd[100];
@@ -60,7 +61,6 @@ char lastcmd[100];
 void 
 bg()
 {
-  int lastcmd_len = strlen(lastcmd);
   int cachefd;
   int forkid;
   printf(2, "%s\n", lastcmd);
@@ -93,7 +93,6 @@ fg(char* s)
   while('0' <= *s && *s <= '9')
     fgid = fgid*10 + *s++ - '0';
 
-  int fgpid = 0;
 
 
 }

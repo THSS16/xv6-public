@@ -23,7 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int reparent(int);
+int reparent(int,int);
 void jobs (void);
 
 // ulib.c

@@ -61,10 +61,10 @@ int main(void)
             printf(1, " ");
 
             pos = partition(line, res, pos);
-            int pid = atoi(res);
+            //int pid = atoi(res);
             
             //to change
-            int state = getStateByPid(pid);
+            int state = UNUSED;//getStateByPid(pid);
             
             switch(state)
             {
