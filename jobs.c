@@ -2,6 +2,7 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
+#include "jobsconst.h"
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
@@ -31,7 +32,7 @@ int main(void)
     
     close(fd);*/
 
-    fd = open("processInfo", O_RDONLY);
+    fd = open(JOBS_FILENAME, O_RDONLY);
     if(fd >= 0) 
     {
         printf(1, "ok: open file succeed\n");
@@ -50,33 +51,32 @@ int main(void)
         if(size > 100 || size < 0)
             break;
         char res[20];
+        char slash[] = " ";
         int pos = 0;
+                  
+        //printf(1,"%d",id);//输出编号
+        //printf(1,slash);
+
         pos = partition(line, res, pos);
+        int pid = atoi(res);
+            
+        int state = getstate(pid);
+            
+        pos = partition(line, res, pos);
+        printf(1, res);//输出名称
+        printf(1,slash);
+
+        switch(state)
         {
-            printf(1,"%d",id);//输出编号
-            printf(1, " ");
+            case UNUSED: printf(1,"UNUSED\n"); break;
+            case EMBRYO: printf(1,"EMBRYO\n"); break;
+            case SLEEPING: printf(1,"SLEEPING\n"); break;
+            case RUNNABLE: printf(1,"RUNNABLE\n"); break;
+            case ZOMBIE: printf(1,"ZOMBIE\n"); break;
+            default: printf(1,"ERR STATE\n"); break;
+        }           
 
-            pos = partition(line, res, pos);
-            printf(1, res);//输出名称
-            printf(1, " ");
-
-            pos = partition(line, res, pos);
-            int pid = atoi(res);
-            
-            //to change
-            int state = getStateByPid(pid);
-            
-            switch(state)
-            {
-                case UNUSED: printf(1,"UNUSED\n"); break;
-                case EMBRYO: printf(1,"EMBRYO\n"); break;
-                case SLEEPING: printf(1,"SLEEPING\n"); break;
-                case RUNNABLE: printf(1,"RUNNABLE\n"); break;
-                case ZOMBIE: printf(1,"ZOMBIE\n"); break;
-                default: printf(1,"ERR STATE\n"); break;
-            }
-            id++;
-        }
+        id++;       
     }
     //printf(1, "read all\n");
     close(fd);
