@@ -586,7 +586,7 @@ suspend(void)
   struct proc *p;
   cprintf("\nCtrl+C detected\n");
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if (p != initproc && p->pid != 2) {
+    if (p != initproc && p->pid != 2 && p->state == RUNNING) {
       p->killed = 1;
       return kill(p->pid);
     }

@@ -3,6 +3,7 @@
 #include "types.h"
 #include "user.h"
 #include "fcntl.h"
+#include "jobsconst.h"
 
 // Parsed command representation
 #define EXEC  1
@@ -55,7 +56,8 @@ struct cmd *parsecmd(char*);
 void runcmd(struct cmd*);
 
 //cache for last cmd
-char lastcmd[100];
+char lastcmd[2][100];
+int lastcmd_pointer;
 
 //Run bg
 void 
@@ -63,16 +65,18 @@ bg()
 {
   int cachefd;
   int forkid;
-  printf(2, "%s\n", lastcmd);
-  cachefd = open("processinfo", O_WRONLY);
+  if(lastcmd[lastcmd_pointer][0] = 0)
+    printf(2, "No current job\n");
+  printf(1, "%s &\n", lastcmd[lastcmd_pointer]);
+  cachefd = open(FILENAME, O_WRONLY);
   if (cachefd < 0)
-    cachefd = open("processinfo", O_CREATE | O_WRONLY);
+    cachefd = open(FILENAME, O_CREATE | O_WRONLY);
 
   forkid = fork1();
   if (forkid == 0)
   {
     reparent(forkid, 2);
-    runcmd(parsecmd(lastcmd));
+    runcmd(parsecmd(lastcmd[lastcmd_pointer]));
   }
   else
   {
@@ -210,7 +214,8 @@ main(void)
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
-    strcpy(lastcmd, buf);
+    strcpy(lastcmd[lastcmd_pointer], buf);
+    lastcmd_pointer = 1 - lastcmd_pointer;
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       // Chdir must be called by the parent, not the child.
       buf[strlen(buf)-1] = 0;  // chop \n
