@@ -583,7 +583,13 @@ getstate(int pid)
 int
 suspend(void)
 {
-  struct proc *p = myproc();
+  struct proc *p;
   cprintf("\nCtrl+C detected\n");
-  return kill(p->pid);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if (p != initproc && p->pid != 2) {
+      p->killed = 1;
+      return kill(p->pid);
+    }
+  }
+  return -1;
 }
