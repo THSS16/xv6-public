@@ -61,7 +61,7 @@ int main(void)
             int pid = atoi(res);
             
             //to change
-            int state = getStateByPid(pid);
+            int state = getstate(pid);
             
             switch(state)
             {
