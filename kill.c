@@ -8,12 +8,12 @@
 int 
 main(int argc, char **argv)
 {
-	int fd =  open(FILENAME, O_CREATE|O_WRONLY);
+	int fd =  open(JOBS_FILENAME, O_CREATE|O_WRONLY);
 	printf(fd, "123\n");
 	printf(fd, "123\n");
 	printf(fd, "123\n");
 	close(fd);
-	fd = open(FILENAME, O_RDONLY);
+	fd = open(JOBS_FILENAME, O_RDONLY);
 
 	int i;
 	if (argc < 2) {

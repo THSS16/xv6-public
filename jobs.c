@@ -2,6 +2,7 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
+#include "jobsconst.h"
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
@@ -31,7 +32,7 @@ int main(void)
     
     close(fd);*/
 
-    fd = open("processInfo", O_RDONLY);
+    fd = open(JOBS_FILENAME, O_RDONLY);
     if(fd >= 0) 
     {
         printf(1, "ok: open file succeed\n");

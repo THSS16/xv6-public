@@ -71,9 +71,9 @@ bg()
     printf(2, "No current job\n");
  
   printf(1, "%s &\n", lastcmd[lastcmd_pointer]);
-  cachefd = open(FILENAME, O_WRONLY);
+  cachefd = open(JOBS_FILENAME, O_WRONLY);
   if (cachefd < 0)
-    cachefd = open(FILENAME, O_CREATE | O_WRONLY);
+    cachefd = open(JOBS_FILENAME, O_CREATE | O_WRONLY);
 
   forkid = fork1();
   if (forkid == 0)
