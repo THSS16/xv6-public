@@ -2,18 +2,17 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
-#include "jobsconst.h"
 
 
 int 
 main(int argc, char **argv)
 {
-	int fd =  open(JOBS_FILENAME, O_CREATE|O_WRONLY);
-	printf(fd, "123\n");
-	printf(fd, "123\n");
-	printf(fd, "123\n");
-	close(fd);
-	fd = open(JOBS_FILENAME, O_RDONLY);
+	//int fd =  open("processInfo", O_CREATE|O_WRONLY);
+	//printf(fd, "1\n");
+	//printf(fd, "123\n");
+	//printf(fd, "123\n");
+	//close(fd);
+	int fd = open("processInfo", O_RDONLY);
 
 	int i;
 	if (argc < 2) {
@@ -21,7 +20,7 @@ main(int argc, char **argv)
 		exit();
 	}
 	for (i = 1; i < argc; i++) {
-		//printf(2,"%s\n", argv[i]);
+		//printf(2,"%s\n", argv[i])
 		if (argv[i][0] == '%') {//kill backstage process
 			//int found = 0;
 			char newargv[10];//remove %
@@ -53,12 +52,16 @@ main(int argc, char **argv)
 					break;
 					}
 			}
+			if(id_to_found == 0) {
+				printf(2,"process id numbered from 1\n");
+				continue;
+			}
+			strcpy(pid_backstage, "");
 			int j = 0;
 			while (buf[j] == ' ') {
 					j++;
 			}
 			while (buf[j] != ' ' && buf[j] != '\0') {
-				strcpy(pid_backstage, "");
 				char bufarray[2];
 				bufarray[0] = buf[j];
 				bufarray[1] = '\0';
