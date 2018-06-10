@@ -2,7 +2,6 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
-#include "jobsconst.h"
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
@@ -32,8 +31,12 @@ int main(void)
     
     close(fd);*/
 
-    fd = open(FILENAME, O_RDONLY);
-    if(fd < 0) 
+    fd = open("processInfo", O_RDONLY);
+    if(fd >= 0) 
+    {
+        printf(1, "ok: open file succeed\n");
+    } 
+    else 
     {
         printf(1, "error: open file failed\n");
         exit();
@@ -54,23 +57,25 @@ int main(void)
             printf(1, " ");
 
             pos = partition(line, res, pos);
-            printf(1, res);//输出名称
-            printf(1, " ");
-
-            pos = partition(line, res, pos);
             int pid = atoi(res);
             
-            int state = getstate(pid);
-
+            //to change
+            int state = getStateByPid(pid);
+            
             switch(state)
             {
-                case UNUSED: printf(1,"UNUSED\n"); break;
-                case EMBRYO: printf(1,"EMBRYO\n"); break;
-                case SLEEPING: printf(1,"SLEEPING\n"); break;
-                case RUNNABLE: printf(1,"RUNNABLE\n"); break;
-                case ZOMBIE: printf(1,"ZOMBIE\n"); break;
-                default: printf(1,"ERR STATE\n"); break;
-            }
+                case UNUSED: printf(1,"UNUSED "); break;
+                case EMBRYO: printf(1,"EMBRYO "); break;
+                case SLEEPING: printf(1,"SLEEPING "); break;
+                case RUNNABLE: printf(1,"RUNNABLE "); break;
+                case ZOMBIE: printf(1,"ZOMBIE "); break;
+                default: printf(1,"ERR STATE "); break;
+            }           
+
+            pos = partition(line, res, pos);
+            printf(1, res);//输出名称
+            printf(1,"\n");
+
             id++;
         }
     }
