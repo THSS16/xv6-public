@@ -104,6 +104,8 @@ extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_reparent(void);
+extern int sys_getstate(void);
+extern int sys_suspend(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -128,6 +130,8 @@ static int (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_reparent] sys_reparent,
+[SYS_getstate] sys_getstate,
+[SYS_suspend] sys_suspend,
 };
 
 void

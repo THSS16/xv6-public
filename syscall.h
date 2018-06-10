@@ -22,3 +22,5 @@
 #define SYS_close  21
 
 #define SYS_reparent 22
+#define SYS_getstate 23
+#define SYS_suspend 24

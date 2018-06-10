@@ -120,7 +120,9 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-void            reparent(int);
+void            reparent(int,int);
+int             getstate(int);
+int            suspend(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

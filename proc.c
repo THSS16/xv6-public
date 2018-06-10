@@ -533,21 +533,63 @@ procdump(void)
   }
 }
 
-// Make init become the proc's parent (specified by pid)
+//Make parentpid become pid's parent
 void 
-reparent(int pid)
+reparent(int pid,int parentpid)
 {
   struct proc *p;
+  struct proc *parent = 0;
 
   acquire(&ptable.lock);
 
   for (p = ptable.proc; p < &ptable.proc[NPROC];p++){
+    if(p->pid == parentpid)
+      parent = p;
+  }
+  if(parent == 0){
+    release(&ptable.lock);
+    return;
+  }
+
+  for (p = ptable.proc; p < &ptable.proc[NPROC];p++){
     if(p->pid == pid){
-      myproc()->parent = p;
+      p->parent = parent;
       release(&ptable.lock);
       return;
     }
   }
   release(&ptable.lock);
   return;
+}
+
+//Get pid's current running state
+int
+getstate(int pid)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      release(&ptable.lock);
+      return p->state;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+//Suspend current foreground process
+int
+suspend(void)
+{
+  struct proc *p;
+  cprintf("\nCtrl+C detected\n");
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if (p != initproc && p->pid != 2 && (p->state == RUNNING || p->state == SLEEPING)) {
+      p->killed = 1;
+      return kill(p->pid);
+    }
+  }
+  return -1;
 }

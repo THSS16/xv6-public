@@ -94,9 +94,29 @@ int
 sys_reparent(void)
 {
   int pid;
+  int parent;
 
   if(argint(0, &pid) < 0)
     return -1;
-  reparent(pid);
+  if (argint(0, &parent) < 0)
+    return -1;
+
+  reparent(pid,parent);
   return 0;
+}
+
+int 
+sys_getstate(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+
+  return getstate(pid);
+}
+int
+sys_suspend(void)
+{
+  return suspend();
 }

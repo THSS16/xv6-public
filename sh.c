@@ -3,6 +3,7 @@
 #include "types.h"
 #include "user.h"
 #include "fcntl.h"
+#include "jobsconst.h"
 
 // Parsed command representation
 #define EXEC  1
@@ -52,7 +53,56 @@ struct backcmd {
 int fork1(void);  // Fork but panics on failure.
 void panic(char*);
 struct cmd *parsecmd(char*);
+void runcmd(struct cmd*);
 
+//cache for last cmd
+char lastcmd[2][100];
+int lastcmd_pointer;
+
+//Run bg
+void 
+bg()
+{
+  int cachefd;
+  int forkid;
+  char *now = lastcmd[lastcmd_pointer];
+  now[strlen(now) - 1] = 0;
+  if(lastcmd[lastcmd_pointer][0] == 0)
+    printf(2, "No current job\n");
+ 
+  printf(1, "%s &\n", lastcmd[lastcmd_pointer]);
+  cachefd = open(JOBS_FILENAME, O_WRONLY);
+  if (cachefd < 0)
+    cachefd = open(JOBS_FILENAME, O_CREATE | O_WRONLY);
+
+  forkid = fork1();
+  if (forkid == 0)
+  {
+    reparent(forkid, 2);
+    runcmd(parsecmd(lastcmd[lastcmd_pointer]));
+  }
+  else
+  {
+    if (cachefd < 0)
+      printf(2, "Cannot open processinfo");
+    else
+      printf(cachefd, "%d %s\n", forkid,lastcmd[lastcmd_pointer]);
+  }
+exit();
+}
+
+//Run fg
+void
+fg(char* s)
+{
+  int fgid;
+  fgid = 0;
+  while('0' <= *s && *s <= '9')
+    fgid = fgid*10 + *s++ - '0';
+
+  reparent(fgid,getpid());
+  wait();
+}
 // Execute cmd.  Never returns.
 void
 runcmd(struct cmd *cmd)
@@ -75,7 +125,15 @@ runcmd(struct cmd *cmd)
     ecmd = (struct execcmd*)cmd;
     if(ecmd->argv[0] == 0)
       exit();
-    exec(ecmd->argv[0], ecmd->argv);
+    if (ecmd->argv[0][0] == 'b' && ecmd->argv[0][1] == 'g'){
+      bg();
+    }
+    else if (ecmd->argv[0][0] == 'f' && ecmd->argv[0][1] == 'g'){
+      fg(ecmd->argv[0] + 3);
+    }
+    else{
+      exec(ecmd->argv[0], ecmd->argv);
+    }
     printf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
@@ -124,7 +182,7 @@ runcmd(struct cmd *cmd)
   case BACK:
     bcmd = (struct backcmd*)cmd;
     if(fork1() == 0){
-      reparent(2);
+      reparent(getpid(),2);
       runcmd(bcmd->cmd);
     }
     break;
@@ -159,6 +217,8 @@ main(void)
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
+    strcpy(lastcmd[lastcmd_pointer], buf);
+    lastcmd_pointer = 1 - lastcmd_pointer;
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       // Chdir must be called by the parent, not the child.
       buf[strlen(buf)-1] = 0;  // chop \n

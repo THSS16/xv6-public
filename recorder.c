@@ -1,11 +1,12 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "fcntl.h"
 
 int main(void)
 {
-    int fd = open("record", 1);
-    if (fd < 3) {
+    int fd = open("record", O_CREATE | O_WRONLY);
+    if (fd < 2) {
         printf(1, "Open file error\n");
         exit();
     }
