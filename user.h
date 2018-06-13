@@ -1,3 +1,6 @@
+#ifndef USER_H
+#define USER_H
+
 struct stat;
 struct rtcdate;
 
@@ -23,17 +26,26 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int gettime(struct rtcdate*);
+int isatty(int fd);
+int lseek(int fd, int ptr, int dir);
 
 // ulib.c
 int stat(char*, struct stat*);
-char* strcpy(char*, char*);
-void *memmove(void*, void*, int);
-char* strchr(const char*, char c);
-int strcmp(const char*, const char*);
 void printf(int, char*, ...);
 char* gets(char*, int max);
-uint strlen(char*);
-void* memset(void*, int, uint);
-void* malloc(uint);
-void free(void*);
 int atoi(const char*);
+
+#include <stdlib.h>
+#include <string.h>
+
+#endif
+
+//char* strcpy(char*, char*);
+//void *memmove(void*, void*, int);
+//char* strchr(const char*, char c);
+//int strcmp(const char*, const char*);
+//uint strlen(char*);
+//void* memset(void*, int, uint);
+//void* malloc(uint);
+//void free(void*);
