@@ -10,6 +10,8 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+struct shmnode;
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
@@ -52,6 +54,10 @@ struct inode*   nameiparent(char*, char*);
 int             readi(struct inode*, char*, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, char*, uint, uint);
+int             swapalloc(struct proc *p);
+int             swapdealloc(struct proc *p);
+int             swapread(struct proc *p, char *buf, uint offset, uint size);
+int             swapwrite(struct proc *p, char *buf, uint offset, uint size);
 
 // ide.c
 void            ideinit(void);
@@ -68,6 +74,10 @@ char*           kalloc(void);
 void            kfree(char*);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
+uint            get_num_free_pages(void);
+void            incr_page_ref(int);
+void            decr_page_ref(int);
+ushort          get_page_ref(int);
 
 // kbd.c
 void            kbdintr(void);
@@ -120,6 +130,10 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void            swaptableinit(void);
+int             swapstab_growpage(struct proc *pr);
+void            memstab_clear(struct proc*);
+void            swapstab_clear(struct proc*);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -147,7 +161,8 @@ char*           safestrcpy(char*, const char*, int);
 int             strlen(const char*);
 int             strncmp(const char*, const char*, uint);
 char*           strncpy(char*, const char*, int);
-
+char*           itoa(int i, char *s);
+int             kstrcmp(const char *p, const char *q);
 // syscall.c
 int             argint(int, int*);
 int             argptr(int, char**, int);
@@ -155,6 +170,11 @@ int             argstr(int, char**);
 int             fetchint(uint, int*);
 int             fetchstr(uint, char**);
 void            syscall(void);
+
+// sysfile.c
+struct inode *  create(char *path, short type, short major, short minor);
+int             isdirempty(struct inode *dp);
+int             kunlink(char* path);
 
 // timer.c
 void            timerinit(void);
@@ -185,6 +205,13 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+void            pagefault(uint err_code);
+void            swappage(uint);
+void            initshm(void);
+int             createshm(uint sig, uint bytes);
+int             deleteshm(uint sig);
+int             readshm(uint sig, char* rstr, uint num, uint offset);
+int             writeshm(uint sig, char* wstr, uint num, uint offset);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

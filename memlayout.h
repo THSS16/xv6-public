@@ -8,6 +8,12 @@
 #define KERNBASE 0x80000000         // First kernel virtual address
 #define KERNLINK (KERNBASE+EXTMEM)  // Address where kernel is linked
 
+// Definition for user processes.
+#define USERTOP KERNBASE            // Top of user mem space. Should be the multiple of PGSIZE.
+
+// A special addr indicating this page slot can be used.
+#define SLOT_USABLE ((char*)0xffffffff)         
+
 #define V2P(a) (((uint) (a)) - KERNBASE)
 #define P2V(a) (((void *) (a)) + KERNBASE)
 
