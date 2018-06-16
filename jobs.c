@@ -10,32 +10,10 @@ int main(void)
 {
     int fd;
     
-    //测试代码
-    /*fd = open("processInfo", O_CREATE );
-    close(fd);
-    fd = open("processInfo", O_WRONLY);
-    if(fd >= 0) 
-    {
-        printf(1, "ok: open file succeed\n");
-    } 
-    else 
-    {
-        printf(1, "error: open file failed\n");
-        exit();
-    }
-
-    char str[] = "1 test 1\n2 blabla 2\n";
-    if(write(fd, str, sizeof(str)) != sizeof(str))
-        printf(1,"err");
-    else
-        printf(1,str);
-    
-    close(fd);*/
-
     fd = open(JOBS_FILENAME, O_RDONLY);
     if(fd >= 0) 
     {
-        printf(1, "ok: open file succeed\n");
+        //printf(1, "ok: open file succeed\n");
     } 
     else 
     {
@@ -54,9 +32,6 @@ int main(void)
         char slash[] = " ";
         int pos = 0;
                   
-        //printf(1,"%d",id);//输出编号
-        //printf(1,slash);
-
         pos = partition(line, res, pos);
         int pid = atoi(res);
             
@@ -73,7 +48,7 @@ int main(void)
             case SLEEPING: printf(1,"SLEEPING\n"); break;
             case RUNNABLE: printf(1,"RUNNABLE\n"); break;
             case ZOMBIE: printf(1,"ZOMBIE\n"); break;
-            default: printf(1,"ERR STATE\n"); break;
+            default: printf(1,"STOPPED\n"); break;
         }           
 
         id++;       

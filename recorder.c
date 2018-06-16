@@ -5,7 +5,9 @@
 
 int main(void)
 {
-    int fd = open("record", O_CREATE | O_WRONLY);
+    int fd = open("record", O_WRONLY);
+    if(fd<0)
+        fd = open("record", O_CREATE | O_WRONLY);
     if (fd < 2) {
         printf(1, "Open file error\n");
         exit();
@@ -21,5 +23,6 @@ int main(void)
             }
         }
     }
+    close(fd);
     exit();
 }

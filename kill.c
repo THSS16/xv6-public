@@ -2,17 +2,13 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
+#include "jobsconst.h"
 
 
 int 
 main(int argc, char **argv)
 {
-	//int fd =  open("processInfo", O_CREATE|O_WRONLY);
-	//printf(fd, "1\n");
-	//printf(fd, "123\n");
-	//printf(fd, "123\n");
-	//close(fd);
-	int fd = open("processInfo", O_RDONLY);
+	int fd = open(JOBS_FILENAME, O_RDONLY);
 
 	int i;
 	if (argc < 2) {

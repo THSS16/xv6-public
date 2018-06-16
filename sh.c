@@ -59,21 +59,48 @@ void runcmd(struct cmd*);
 char lastcmd[2][100];
 int lastcmd_pointer;
 
+//write a command to JOBS_FILENAME
+void 
+recordcmd(int pid,char* cmdname)
+{
+  int cachefd;
+  int buffersize = 1024;
+  int haveread = 0;
+  char buf[1024];
+
+  cachefd = open(JOBS_FILENAME,O_RDONLY);
+  if (cachefd >= 0) {
+    haveread = read(cachefd,buf,buffersize);
+    buf[haveread] = 0;
+    close(cachefd);
+  }
+
+  cachefd = open(JOBS_FILENAME, O_WRONLY);
+  if (cachefd < 0)
+    cachefd = open(JOBS_FILENAME, O_CREATE | O_WRONLY);
+  if (cachefd < 0){
+    printf(2, "Cannot open ");
+    printf(2,JOBS_FILENAME);
+    printf(2,"\n");
+  }
+  else{
+    write(cachefd,buf,haveread);
+    printf(cachefd, "%d %s\n", pid, cmdname);
+    close(cachefd);
+  }
+  return;
+}
 //Run bg
 void 
 bg()
 {
-  int cachefd;
   int forkid;
-  char *now = lastcmd[lastcmd_pointer];
-  now[strlen(now) - 1] = 0;
-  if(lastcmd[lastcmd_pointer][0] == 0)
+  if(lastcmd[lastcmd_pointer][0] == 0){
     printf(2, "No current job\n");
+    return;
+  }
  
   printf(1, "%s &\n", lastcmd[lastcmd_pointer]);
-  cachefd = open(JOBS_FILENAME, O_WRONLY);
-  if (cachefd < 0)
-    cachefd = open(JOBS_FILENAME, O_CREATE | O_WRONLY);
 
   forkid = fork1();
   if (forkid == 0)
@@ -83,31 +110,32 @@ bg()
   }
   else
   {
-    if (cachefd < 0)
-      printf(2, "Cannot open processinfo");
-    else
-      printf(cachefd, "%d %s\n", forkid,lastcmd[lastcmd_pointer]);
+    recordcmd(forkid,lastcmd[lastcmd_pointer]);
   }
 exit();
 }
 
 //Run fg
+//Important:this function has not been completed
 void
 fg(char* s)
 {
+  printf(2,s);
   int fgid;
   fgid = 0;
   while('0' <= *s && *s <= '9')
     fgid = fgid*10 + *s++ - '0';
 
-  reparent(fgid,getpid());
+  reparent(fgid,2);
   wait();
+  exit();
 }
 // Execute cmd.  Never returns.
 void
 runcmd(struct cmd *cmd)
 {
   int p[2];
+  int forkid;
   struct backcmd *bcmd;
   struct execcmd *ecmd;
   struct listcmd *lcmd;
@@ -181,10 +209,13 @@ runcmd(struct cmd *cmd)
 
   case BACK:
     bcmd = (struct backcmd*)cmd;
-    if(fork1() == 0){
+    forkid = fork1();
+    if(forkid == 0){
       reparent(getpid(),2);
       runcmd(bcmd->cmd);
     }
+    else
+      recordcmd(forkid,lastcmd[1-lastcmd_pointer]);
     break;
   }
   exit();
@@ -215,9 +246,13 @@ main(void)
     }
   }
 
+  //clear processInfo
+  unlink(JOBS_FILENAME);
+
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
     strcpy(lastcmd[lastcmd_pointer], buf);
+    lastcmd[lastcmd_pointer][strlen(lastcmd[lastcmd_pointer]) - 1] = 0;
     lastcmd_pointer = 1 - lastcmd_pointer;
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       // Chdir must be called by the parent, not the child.
