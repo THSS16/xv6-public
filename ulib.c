@@ -67,6 +67,14 @@ gets(char *buf, int max)
   return buf;
 }
 
+char
+getc()
+{
+  int c;
+  read(0, &c, 1);
+  return c;
+}
+
 int
 stat(char *n, struct stat *st)
 {

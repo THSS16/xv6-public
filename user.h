@@ -27,6 +27,23 @@ int reparent(int,int);
 void jobs (void);
 int getstate(int);
 int suspend(int);
+int inittaskmgr(void);
+int closetaskmgr(void);
+int getprocinfo(int*, char(*)[16], int*, uint*);
+int updscrcont(char*, int);
+int nfpgs(void);
+int createshm(uint, uint);
+int deleteshm(uint);
+int readshm(uint, char*, uint, uint);
+int writeshm(uint, char*, uint, uint);
+
+int setconsole(int, int, int, int, int);
+void clearc(void);
+void insertc(int c);
+int shutdown(void);
+int lseek(int, int, int);
+int gettimestamp(void);
+int getcwd(char *);
 
 // ulib.c
 int stat(char*, struct stat*);
@@ -37,6 +54,7 @@ int strcmp(const char*, const char*);
 void printf(int, char*, ...);
 char* gets(char*, int max);
 uint strlen(char*);
+char getc(void);
 void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
