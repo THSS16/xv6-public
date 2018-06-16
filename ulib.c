@@ -112,7 +112,7 @@ memmove(void *vdst, void *vsrc, int n)
   return vdst;
 }
 
-int readline(int fd, char* line, int n)
+int jobs_readline(int fd, char* line, int n)
 {  
   strcpy(line, "\0"); 
   int i = 0;  

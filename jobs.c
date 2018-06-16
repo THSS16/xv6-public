@@ -25,7 +25,7 @@ int main(void)
     int size;
     while(1)//读入每行
     {
-        size = readline(fd, line, 100);
+        size = jobs_readline(fd, line, 100);
         if(size > 100 || size < 0)
             break;
         char res[20];

@@ -59,5 +59,5 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
-int readline(int fd, char* line, int n);
+int jobs_readline(int fd, char* line, int n);
 int partition(char *src, char *par, int pos);

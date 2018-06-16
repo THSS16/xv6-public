@@ -36,7 +36,7 @@ main(int argc, char **argv)
 			char buf[100]; 
 			for(int k = 0; k < id_to_found; k++) {//get id from file
 				strcpy(buf, "");
-				int n = readline(fd, buf, sizeof(buf));
+				int n = jobs_readline(fd, buf, sizeof(buf));
 				//printf(2,"%d\n", n);
 				if (n < 0) {
 					printf(2,"read error\n");
