@@ -1,6 +1,7 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "fcntl.h"
 
 char buf[512];
 
@@ -19,6 +20,7 @@ cat(int fd)
     printf(1, "cat: read error\n");
     exit();
   }
+  printf(1, "\n");
 }
 
 int
@@ -34,6 +36,8 @@ main(int argc, char *argv[])
   for(i = 1; i < argc; i++){
     if((fd = open(argv[i], 0)) < 0){
       printf(1, "cat: cannot open %s\n", argv[i]);
+      fd = open(argv[i], O_CREATE);
+      printf(1, "%s created\n", argv[i]);
       exit();
     }
     cat(fd);

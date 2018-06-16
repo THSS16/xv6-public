@@ -47,12 +47,19 @@ sys_sbrk(void)
 {
   int addr;
   int n;
+  struct proc* curproc = myproc();
 
   if(argint(0, &n) < 0)
     return -1;
-  addr = myproc()->sz;
-  if(growproc(n) < 0)
+  addr = curproc->sz;
+  if (n < 0 && growproc(n) < 0)
     return -1;
+
+  // Avoid heap grows higher than stack.
+  if (curproc->sz + n > USERTOP - curproc->stack_size - PGSIZE)
+    return -1;
+
+  curproc->sz += n;
   return addr;
 }
 
@@ -119,4 +126,138 @@ int
 sys_suspend(void)
 {
   return suspend();
+}
+sys_inittaskmgr(void)
+{
+  return inittaskmgr();
+}
+
+int
+sys_closetaskmgr(void)
+{
+  return closetaskmgr();
+}
+
+int
+sys_getprocinfo(void)
+{
+  int *pid;
+  char (*name)[16];
+  int *state;
+  uint *sz;
+
+  if(argptr(0, (void*)&pid, 64*sizeof(int)) < 0 ||
+     argptr(1, (void*)&name, 64*16*sizeof(char)) < 0 ||
+     argptr(2, (void*)&state, 64*sizeof(int)) < 0 ||
+     argptr(3, (void*)&sz, 64*sizeof(uint)) < 0)
+    return -1;
+  return getprocinfo(pid, name, state, sz);
+}
+
+int
+sys_updscrcont(void)
+{
+  char *buf;
+  int curline;
+
+  if(argptr(0, &buf, 24 * 80) < 0 || argint(1, &curline))
+    return -1;
+  return updscrcont(buf, curline);
+}
+
+
+int sys_nfpgs(void)
+{
+    return get_num_free_pages();
+}
+
+// return 1 when succeed, return 0 when fail
+int
+sys_createshm(void)
+{
+    int sig, bytes;
+    if(argint(0, &sig) < 0 || argint(1, &bytes) < 0)
+    {
+        return 0;
+    }
+    return createshm(sig,bytes);
+}
+
+// return 1 when succeed, return 0 when fail.
+int
+sys_deleteshm(void)
+{
+    int sig;
+    if(argint(0, &sig) < 0)
+    {
+        return 0;
+    }
+    return deleteshm(sig);
+}
+
+//return the number of characters actually written in
+int
+sys_writeshm(void)
+{
+    int sig;
+    char* str;
+    int num;
+    int offset;
+    if(argint(0, &sig) < 0 || argstr(1, &str) < 0 || argint(2, &num) < 0 || argint(3, &offset) < 0)
+    {
+        return 0;
+    }
+    return writeshm(sig, str, num, offset);
+}
+
+// return the number of characters actually read from shmpages
+int
+sys_readshm(void)
+{
+    int sig;
+    char* str;
+    int num;
+    int offset;
+    if(argint(0, &sig) < 0 || argstr(1, &str) < 0 || argint(2, &num) < 0 || argint(3 ,&offset) < 0)
+    {
+        return 0;
+    }
+    return readshm(sig, str, num, offset);
+}
+
+// Halt (shutdown) the system by sending a special signal to QEMU.
+// Based on: https://github.com/noah-mcaulay/XV6-Operating-System/blob/master/sysproc.c
+int
+sys_shutdown(void)
+{
+    outw(0x604, 0x0 | 0x2000);
+    return 0;
+}
+
+//get current system timestamp
+//Added by Zhao Zhehui
+int
+sys_gettimestamp(void)
+{
+    rtcdate date;
+    datetime(&date);
+    uint ret = 946684800; //utc+0 2000/1/1 0:0:0 946684800
+    int days[]={31,28,31,30,31,30,31,31,30,31,30,31};
+    int year4num = (date.year - 2000) / 4;
+    ret += year4num*(365*4+1)*86400;
+    int yearfor4 = date.year - year4num * 4 - 2000;
+    if(yearfor4>0)
+    {
+        ret += 366 * 86400;
+        yearfor4--;
+        ret += yearfor4 * 365 * 86400;
+    }
+    else
+        days[1] = 29;
+    int i;
+    for(i = 1; i < date.month; i++)
+        ret += days[i-1]*86400;
+    ret += (date.day - 1) * 86400;
+    ret += (date.hour * 3600 + date.minute * 60 + date.second);
+    return ret;
 }

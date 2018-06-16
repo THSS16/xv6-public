@@ -293,5 +293,6 @@ iappend(uint inum, void *xp, int n)
     p += n1;
   }
   din.size = xint(off);
+  din.ctime = 1452978035;//初始化节点时间
   winode(inum, &din);
 }
