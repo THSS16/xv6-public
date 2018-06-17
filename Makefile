@@ -139,7 +139,7 @@ vectors.S: vectors.pl
 
 ULIB = ulib.o usys.o printf.o
 LIBC = libc/libc.a
-START = _start.o
+START = start.o
 
 $(LIBC):
 	$(MAKE) -C ./libc all
