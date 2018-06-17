@@ -34,20 +34,6 @@ void desktopInitStringFigure()
   printf(1, "init string figure complete\n");
 }
 
-//static PHdc background;
-
-void runApp(void * param)
-{
-  int pid = fork();
-  char temp[30];
-  if (pid == 0)
-  {
-    sprintf(temp, "PVC%s", (char *)param);
-    char *argv[] = { temp, 0 };
-    exec(temp, argv);
-  }
-}
-
 PHControl desktopCreateItem(PHwnd hwnd, int x, int y, int w, int h, void * param)
 {
   PHControl item = (PHControl)pvcCreateControl(hwnd, x, y, w, h, 0, desktopItemProc);
@@ -129,20 +115,29 @@ void desktopPaintItem(PItemData * data, PHdc hdc)
     {
       for (int j = 0; j < hdc->size.cx; ++j)
       {
-        PColor c = hdc->content[i * hdc->size.cx + j];
-        int t = (int)c.b + 50;
-        if (t > 255)
-          t = 255;
-        c.b = t;
-        t = (int)c.r - 50;
-        if (t < 0)
-          t = 0;
-        c.r = t;
-        t = (int)c.g - 50;
-        if (t < 0)
-          t = 0;
-        c.g = t;
-        hdc->content[i * hdc->size.cx + j] = c;
+        PColor col = hdc->content[i * hdc->size.cx + j];
+		// 
+        int t = (int)col.b + 50;
+		if (t > 255)
+		{
+			t = 255;
+		}
+		col.b = t;
+
+        t = (int)col.r - 50;
+		if (t < 0)
+		{
+			t = 0;
+		}
+		col.r = t;
+
+        t = (int)col.g - 50;
+		if (t < 0)
+		{
+			t = 0;
+		}
+		col.g = t;
+        hdc->content[i * hdc->size.cx + j] = col;
       }
     }
     break;

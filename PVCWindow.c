@@ -410,3 +410,34 @@ void pvcPaintMinimizeBtn(PButtonData * data, PHdc hdc)
   hdc->pen.color = RGB(0, 0, 0);
   pvcDrawLine(hdc, 0, hdc->size.cy / 2, hdc->size.cx, hdc->size.cy / 2);
 }
+
+void runApp(void * param)
+{
+	int pid = fork();
+	char temp[30];
+	if (pid == 0)
+	{
+		sprintf(temp, "PVC%s", (char *)param);
+		printf(2, "%s\n", param);
+		char *argv[] = { temp, 0 };
+		exec(temp, argv);
+	}
+}
+
+void runAppWithCmds(void * param, char** cmds)
+{
+	int pid = fork();
+	char temp[30];
+	if (pid == 0)
+	{
+		sprintf(temp, "PVC%s", (char *)param);
+		char *argv[MAX_ARGUMENT] = { temp, 0 };
+		int i = 0;
+		for (; cmds[i] != 0; i++)
+		{
+			argv[i + 1] = cmds[i];
+		}
+		argv[i + 1] = 0;
+		exec(temp, argv);
+	}
+}
