@@ -136,7 +136,7 @@ tags: $(OBJS) entryother.S _init
 vectors.S: vectors.pl
 	perl vectors.pl > vectors.S
 
-ULIB = ulib.o usys.o printf.o umalloc.o PVCPainter.o PVCWindow.o PVCLib.o PVCControl.o PVCDialog.o math.o common.o huffman.o decodemp3.o
+ULIB = ulib.o usys.o printf.o umalloc.o PVCPainter.o PVCWindow.o PVCLib.o PVCControl.o PVCDialog.o PVCDecodeJPEG.o math.o common.o huffman.o decodemp3.o
 
 _%: %.o $(ULIB)
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
@@ -181,14 +181,20 @@ UPROGS=\
 	_playWav\
 	_mp3decodePlay\
 	_playmp3\
+    _PVCPhotoViewer\
 
 PVCFILES =\
 	ASCII\
 	MP3.bmp\
 	RHGameStatus.bmp\
+    PhotoViewer.bmp\
 	desktop.bmp\
 	last.bmp\
 	next.bmp\
+    Snake.bmp\
+    test.jpg\
+    Clock.bmp\
+    NotePad.bmp\
 	#GBK2312\
 	#pointer.bmp\
 
