@@ -676,7 +676,7 @@ void pvcDestroyMenu(PHMenu menu, bool flag)
 void pvcMenuAddItem(PHMenu menu, char * name, void * param, void (*call)(void *))
 {
   PMenuData * data = (PMenuData *)menu->data;
-  if (data->num >= data->len)
+  if (data->num + 1 >= data->len)
   {
     data->len *= 2;
     PMenuUnit * t = data->data;
@@ -830,7 +830,8 @@ PHMenuBar pvcCreateMenuBar(PHwnd hwnd)
 void pvcMenuBarAddMenu(PHMenuBar menuBar, char * name, PHMenu menu)
 {
   PMenuBarData * data = (PMenuBarData *)menuBar->data;
-  if (data->num >= data->len)
+  
+  if (data->num + 1 >= data->len)
   {
     data->len *= 2;
     PMenuBarUnit * t = data->data;
