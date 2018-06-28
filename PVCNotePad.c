@@ -20,6 +20,7 @@ void showFile(PHwnd hwnd, char * buf)
 		return;
 	}
 
+	saved = false;
 	PMultiLineEditData * data = (PMultiLineEditData *)multiLineEdit->data;
 
 	for (int i = 0; i <= data->rows_size; ++i)
@@ -546,9 +547,23 @@ void saveFile(void * param)
     write(file, data->buf[i].buf, sizeof(char) * data->buf[i].length);
     write(file, "\n", sizeof(char));
   }
+
+  saved = true;
   write(file, "\0", sizeof(char));
   close(file);
 }
+
+//void closeWindow(void * hwnd)
+//{
+//	if (saved || MB_ACCEPT == pvcMessageBox(hwnd, "NotePad", "Quit before saving?"))
+//	{
+//		if (MB_ACCEPT == pvcMessageBox(hwnd, "NotePad", "Do you want to quit?"))
+//		{
+//			pvcCloseWindow(hwnd);
+//			return;
+//		}
+//	}
+//}
 
 bool wndProc(PHwnd hwnd, PMessage msg)
 {
@@ -580,9 +595,14 @@ bool wndProc(PHwnd hwnd, PMessage msg)
 		break;
   case MSG_DESTROY:
   {
-    if (MB_ACCEPT == pvcMessageBox (hwnd, "NotePad", "Do you want to quit?"))
-      break;
-    return FINISH;
+	  if (saved || MB_ACCEPT == pvcMessageBox(hwnd, "NotePad", "Quit before saving?"))
+	  {
+		  if (MB_ACCEPT == pvcMessageBox(hwnd, "NotePad", "Do you want to quit?"))
+		  {
+			  break;
+		  }
+	  }
+	  return FINISH;
   }
   case MSG_PAINT:
   {
