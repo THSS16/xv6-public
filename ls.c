@@ -42,35 +42,34 @@ ls(char *path)
     return;
   }
 
-  if(st.showable!=O_HIDE){
-    switch(st.type){
-    case T_FILE:
+  switch(st.type){
+  case T_FILE:
+    if(st.showable!=O_HIDE)
       printf(1, "%s %d %d %d\n", fmtname(path), st.type, st.ino, st.size);
-      break;
-  
-    case T_DIR:
-      if(strlen(path) + 1 + DIRSIZ + 1 > sizeof buf){
-        printf(1, "ls: path too long\n");
-        break;
-      }
-      strcpy(buf, path);
-      p = buf+strlen(buf);
-      *p++ = '/';
-      while(read(fd, &de, sizeof(de)) == sizeof(de)){
-        if(de.inum == 0)
-          continue;
-        memmove(p, de.name, DIRSIZ);
-        p[DIRSIZ] = 0;
-        if(stat(buf, &st) < 0){
-          printf(1, "ls: cannot stat %s\n", buf);
-          continue;
-        }
-        if (fmtname(buf)[0] != '.'){
-          printf(1, "%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
-        }
-      }
+    break;
+
+  case T_DIR:
+    if(strlen(path) + 1 + DIRSIZ + 1 > sizeof buf){
+      printf(1, "ls: path too long\n");
       break;
     }
+    strcpy(buf, path);
+    p = buf+strlen(buf);
+    *p++ = '/';
+    while(read(fd, &de, sizeof(de)) == sizeof(de)){
+      if(de.inum == 0)
+        continue;
+      memmove(p, de.name, DIRSIZ);
+      p[DIRSIZ] = 0;
+      if(stat(buf, &st) < 0){
+        printf(1, "ls: cannot stat %s\n", buf);
+        continue;
+      }
+      if (fmtname(buf)[0] != '.'&&st.showable!=O_HIDE){
+        printf(1, "%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
+      }
+    }
+    break;
   }
   close(fd);
 }

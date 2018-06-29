@@ -36,11 +36,12 @@ The Socialist Soviet Republic of Abkhazia (nominated by Kaiser matias) was a sho
 
 int sig = 23333333;
 int sig2 = 1531534;
+int sig3 = 78945;
 int main()
 {
     printf(1, "================================\n");
     printf(1, "Memory sharing test started.\n");
-    if (createshm(sig, 16000) >= 0 && createshm(sig2, 40) >= 0)
+    if (createshm(sig, 16000, 0) >= 0 && createshm(sig2, 40, 0) >= 0 && createshm(sig3, 50, 1) >= 0)
         printf(1, "[P] Share memory created.\n");
     else
     {
@@ -60,8 +61,8 @@ int main()
         printf(1, "[C] Receiving message from parent...\n");
         char *read = malloc(16000);
         char *read2 = malloc(16);
-        createshm(sig, 0);
-        createshm(sig2, 0);
+        createshm(sig, 0, 0);
+        createshm(sig2, 0, 0);
         if (readshm(sig, read, 15475, 10) == -1 || readshm(sig2, read2, 16, 0))
         {
             printf(1, "Error!\n");
@@ -76,15 +77,30 @@ int main()
         printf(1, "[C] Full string received by child from parent in sig %d: \n", sig2);
         printf(1, "[C] %s", read2);
         printf(1, "\n");
-        printf(1, "[C] Writing message to parent...\n");
-        char *helloparent = "hello my parent!";
-        writeshm(sig2, helloparent, 17, 2);
-        char *inter = (char *)&number;
-        writeshm(sig2, inter, 4, 20);
-
-        free(read);
-        free(read2);
-        exit();
+        printf(1, "[C] Forking grandchild...\n");
+        if (fork() == 0) // This is child2
+        {
+            createshm(sig3, 0, 1);
+            printf(1, "[G] Writing message to parent parallely with child...\n");
+            char *hellogp = "good morning grandpa! ";
+            writeshm(sig3, hellogp, 22, 0);
+            exit();
+        }
+        else
+        {
+            createshm(sig3, 0, 1);
+            printf(1, "[C] Writing message to parent parallely with grandchild...\n");
+            char *helloparent = "hello my parent!";
+            writeshm(sig2, helloparent, 17, 2);
+            char *inter = (char *)&number;
+            writeshm(sig2, inter, 4, 20);
+            char *hellop = "good morning father!";
+            writeshm(sig3, hellop, 21, 22);
+            free(read);
+            free(read2);
+            wait();
+            exit();
+        }
     }
     else // This is parent.
     {
@@ -92,11 +108,13 @@ int main()
         int *urec = 0;
         char *tmp = malloc(5);
         char *rec = malloc(17);
-        if (readshm(sig2, rec, 17, 2) == -1 || readshm(sig2, tmp, 4, 20) == -1)
+        char *parch = malloc(50);
+        if (readshm(sig2, rec, 17, 2) == -1 || readshm(sig2, tmp, 4, 20) == -1 ||readshm(sig3, parch, 43, 0) == -1)
         {
             printf(1, "Error!\n");
             free(rec);
             free(tmp);
+            free(parch);
             exit();
         }
         printf(1, "[P] Full string received by parent from child in sig %d: \n", sig2);
@@ -105,8 +123,13 @@ int main()
         printf(1, "[P] Integer received by parent from child in sig %d: \n", sig2);
         urec = (int *)tmp;
         printf(1, "[P] %d\n", *urec);
+        printf(1, "[P] String received by parent from child and grandchild in sig %d: \n", sig3);
+        printf(1, "[P] %s", parch);
+        printf(1, "\n");
+
         free(rec);
         free(tmp);
+        free(parch);
     }
 
     if (deleteshm(sig) >= 0 && deleteshm(sig2) >= 0)

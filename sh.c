@@ -1,8 +1,9 @@
 // Shell.
-//sh.c文件的修改者：毛誉陶,江俊广,赵哲晖
+//sh.c文件的修改者：毛誉陶,江俊广,赵哲晖,丁润语
 #include "types.h"
 #include "user.h"
 #include "fcntl.h"
+#include "jobsconst.h"
 #include "history.h"
 #include "console.h"
 #include "stat.h"
@@ -73,12 +74,89 @@ void findCommand(char * buf);
 int fork1(void);  // Fork but panics on failure.
 void panic(char*);
 struct cmd *parsecmd(char*);
+void runcmd(struct cmd*);
 
+//cache for last cmd
+char lastcmd[2][100];
+int lastcmd_pointer;
+
+//write a command to JOBS_FILENAME
+void 
+recordcmd(int pid,char* cmdname)
+{
+  int cachefd;
+  int buffersize = 1024;
+  int haveread = 0;
+  char buf[1024];
+
+  cachefd = open(JOBS_FILENAME,O_RDONLY);
+  if (cachefd >= 0) {
+    haveread = read(cachefd,buf,buffersize);
+    buf[haveread] = 0;
+    close(cachefd);
+  }
+
+  cachefd = open(JOBS_FILENAME, O_WRONLY);
+  if (cachefd < 0)
+    cachefd = open(JOBS_FILENAME, O_CREATE | O_WRONLY);
+  if (cachefd < 0){
+    printf(2, "Cannot open ");
+    printf(2,JOBS_FILENAME);
+    printf(2,"\n");
+  }
+  else{
+    write(cachefd,buf,haveread);
+    printf(cachefd, "%d %s\n", pid, cmdname);
+    close(cachefd);
+  }
+  return;
+}
+//Run bg
+void 
+bg()
+{
+  int forkid;
+  if(lastcmd[lastcmd_pointer][0] == 0){
+    printf(2, "No current job\n");
+    return;
+  }
+ 
+  printf(1, "%s &\n", lastcmd[lastcmd_pointer]);
+
+  forkid = fork1();
+  if (forkid == 0)
+  {
+    reparent(forkid, 2);
+    runcmd(parsecmd(lastcmd[lastcmd_pointer]));
+  }
+  else
+  {
+    recordcmd(forkid,lastcmd[lastcmd_pointer]);
+  }
+exit();
+}
+
+//Run fg
+//Important:this function has not been completed
+void
+fg(char* s)
+{
+  printf(2,s);
+  int fgid;
+  fgid = 0;
+  while('0' <= *s && *s <= '9')
+    fgid = fgid*10 + *s++ - '0';
+
+  reparent(fgid,2);
+  wait();
+  exit();
+}
 // Execute cmd.  Never returns.
 void
 runcmd(struct cmd *cmd)
 {
   int p[2];
+  int forkid;
   struct backcmd *bcmd;
   struct execcmd *ecmd;
   struct listcmd *lcmd;
@@ -104,7 +182,19 @@ runcmd(struct cmd *cmd)
     {
         ncommand[i+1] = ecmd->argv[0][i];
     }
-    exec(ncommand, ecmd->argv);
+//<<<<<<< final_shell
+//    exec(ncommand, ecmd->argv);
+//=======
+    if (ecmd->argv[0][0] == 'b' && ecmd->argv[0][1] == 'g'){
+      bg();
+    }
+    else if (ecmd->argv[0][0] == 'f' && ecmd->argv[0][1] == 'g'){
+      fg(ecmd->argv[0] + 3);
+    }
+    else{
+      exec(ecmd->argv[0], ecmd->argv);
+    }
+//>>>>>>> final_shell
     printf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
@@ -151,8 +241,13 @@ runcmd(struct cmd *cmd)
 
   case BACK:
     bcmd = (struct backcmd*)cmd;
-    if(fork1() == 0)
+    forkid = fork1();
+    if(forkid == 0){
+      reparent(getpid(),2);
       runcmd(bcmd->cmd);
+    }
+    else
+      recordcmd(forkid,lastcmd[1-lastcmd_pointer]);
     break;
   }
   exit();
@@ -335,9 +430,14 @@ main(int argc, char *argv[])
         break;
       }
     }
+    //clear processInfo
+    unlink(JOBS_FILENAME);
 
     // Read and run input commands.
     while(getcmd(buf, sizeof(buf)) >= 0){
+      strcpy(lastcmd[lastcmd_pointer], buf);
+      lastcmd[lastcmd_pointer][strlen(lastcmd[lastcmd_pointer]) - 1] = 0;
+      lastcmd_pointer = 1 - lastcmd_pointer;
       if (buf[0] == '!' && buf[1] == '!')
       {
         strcpy(buf, hs.record[(hs.lastcmd - 1) % H_NUMBER]);

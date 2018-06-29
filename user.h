@@ -26,15 +26,21 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int reparent(int,int);
+void jobs (void);
+int getstate(int);
+int suspend(int);
 int inittaskmgr(void);
 int closetaskmgr(void);
 int getprocinfo(int*, char(*)[16], int*, uint*);
 int updscrcont(char*, int);
 int nfpgs(void);
-int createshm(uint, uint);
+int createshm(uint, uint, int);
 int deleteshm(uint);
 int readshm(uint, char*, uint, uint);
 int writeshm(uint, char*, uint, uint);
+int getsharedpages(void);
+void showproc(void);
 
 int setconsole(int, int, int, int, int);
 void clearc(void);
@@ -53,6 +59,8 @@ int stat(char*, struct stat*);
 void printf(int, char*, ...);
 char* gets(char*, int max);
 int atoi(const char*);
+int jobs_readline(int fd, char* line, int n);
+int partition(char *src, char *par, int pos);
 char getc_from_stdin(void);
 
 #include <stdlib.h>

@@ -113,11 +113,11 @@ panic(char *s)
 {
   int i;
   uint pcs[10];
-
+  
   cli();
   cons.locking = 0;
-
-  //cprintf("cpu%d: panic: ", cpu->id);//!!!此处注释掉后果未知
+  // use lapiccpunum so that we can call panic from mycpu()
+  cprintf("lapicid %d: panic: ", lapicid());
   cprintf(s);
   cprintf("\n");
   getcallerpcs(&s, pcs);
@@ -220,7 +220,7 @@ void recordScreenHistory(){
       for(j = 0; j < 80; j++)
         screenHistory[i][j] = crt[i*80+j];
     }
-    screenHistoryLen = rows;
+    screenHistoryLen = rows;  
   }
   else{   // page up or scroll up: record the last line(mainRows-1)
     for(j=0; j<80; j++){
@@ -298,7 +298,7 @@ static void
 cgaputc(int c)
 {
   int pos;
-
+  
   // Cursor position: col + 80*row.
   outb(CRTPORT, 14);
   pos = inb(CRTPORT+1) << 8;
@@ -311,7 +311,7 @@ cgaputc(int c)
     if(pos > 0) --pos;
   } else
     crt[pos++] = (c&0xff) | 0x0700;  // black on white
-
+  
   /*
   if((pos/80) >= 24){  // Scroll up.
     memmove(crt, crt+80, sizeof(crt[0])*23*80);
@@ -325,7 +325,7 @@ cgaputc(int c)
     recordScreenHistory();
     startScreenLine++;
     screenHistoryLen++;
-
+    
     memmove(crt, crt+80, sizeof(crt[0])*(mainRows-1)*80);
     pos -= 80;
     int i;
@@ -339,7 +339,7 @@ cgaputc(int c)
     recordScreenHistory();
     startScreenLine++;
     screenHistoryLen++;
-
+    
     memmove(crt, crt+80, sizeof(crt[0])*23*80);
     pos -= 80;
     memset(crt+pos, 0, sizeof(crt[0])*(24*80 - pos));
@@ -394,14 +394,14 @@ setcursor(int pos)
         memmove(crt, crt+80, sizeof(crt[0])*23*80);
         pos -= 80;
         memset(crt+pos, 0, sizeof(crt[0])*(24*80 - pos));
-    }
+    }   
     outb(CRTPORT, 14);
     outb(CRTPORT+1, pos>>8);
     outb(CRTPORT, 15);
     outb(CRTPORT+1, pos);
 }
 
-void
+void 
 insertc(int c)
 {
     int pos = getcursor();
@@ -412,9 +412,9 @@ insertc(int c)
             crt[j] = crt[j - 1] | WHITE_ON_BLACK;
         }
         input.buf[input.e % INPUT_BUF] = c;
-
+        
         input.l++;
-
+        
         if (c == '\n'){
             input.e++;
             setcursor(-1);
@@ -458,7 +458,7 @@ deletec(int mode)
         else
             return ;
     }
-
+    
     int i, j;
     for (i = input.e, j = pos; i < input.l; ++i, ++j){
         input.buf[i] = input.buf[i + 1];
@@ -480,19 +480,12 @@ clearline()
     input.l = input.w;
 }
 
-// Some special keycodes
-#define KEY_UP 0xE2
-#define KEY_DN 0xE3
-#define KEY_LF 0xE4
-#define KEY_RT 0xE5
-
-#define C(x)  ((x)-'@')  // Control-x
 void
 clearc()
 {
   acquire(&input.lock);
   int pos = getcursor();
-  if (pos > 0){
+  if (pos > 0){  
     input.buf[input.w] = 0;
     int ipos = --input.w;
     input.r--;
@@ -532,13 +525,13 @@ uartprint(int k)
 }
 
 void handleMemo(int c, int pos){
-  if (c == PGEND){
+  if (c == PGEND){        
     pageEnd();
   }
   else if (c == PGUP){
     pageUp();
   }
-  else if (c == PGDN){
+  else if (c == PGDN){        
     pageDown();
   }
   else if(c != 0)
@@ -560,7 +553,7 @@ void handleMemo(int c, int pos){
     }
   }
   */
-  outb(CRTPORT, 14);
+  outb(CRTPORT, 14); 
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
@@ -569,7 +562,30 @@ void handleMemo(int c, int pos){
 void
 consoleintr(int (*getc)(void))
 {
-    int c, doprocdump = 0;
+  int c;
+  if(runtaskmgr != 0){
+    acquire(&input.lock);
+    while((c = getc()) >= 0){
+      switch(c){
+      case KEY_UP:
+      case KEY_DN:
+      case KEY_LF:
+      case KEY_RT:
+      case 'k':
+      case 'q':
+      case 'f':
+        input.buf[input.e++ % INPUT_BUF] = c;
+        input.w = input.e;
+        wakeup(&input.r);
+        break;
+      default:
+        break;
+      }
+    }
+    release(&input.lock);
+    return;
+  }
+  else{
   // memo [children]
   if(shellStatus == MEMO){
     acquire(&input.lock);
@@ -589,67 +605,10 @@ consoleintr(int (*getc)(void))
     return;
   }
 
-    acquire(&cons.lock);
-    if(runtaskmgr == 0)
-        while((c = getc()) >= 0){
-            switch(c){
-                case C('P'):  // Process listing.
-                    // procdump() locks cons.lock indirectly; invoke later
-                    doprocdump = 1;
-                    break;
-                case C('U'):  // Kill line.
-                    while(input.e != input.w &&
-                          input.buf[(input.e-1) % INPUT_BUF] != '\n'){
-                        input.e--;
-                        consputc(BACKSPACE);
-                    }
-                    break;
-                case C('H'): case '\x7f':  // Backspace
-                    if(input.e != input.w){
-                        input.e--;
-                        consputc(BACKSPACE);
-                    }
-                    break;
-                default:
-                    if(c != 0 && input.e-input.r < INPUT_BUF){
-                        c = (c == '\r') ? '\n' : c;
-                        input.buf[input.e++ % INPUT_BUF] = c;
-                        consputc(c);
-                        if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
-                            input.w = input.e;
-                            wakeup(&input.r);
-                        }
-                    }
-                    break;
-            }
-        }
-    else
-        while((c = getc()) >= 0){
-            switch(c){
-                case KEY_UP:
-                case KEY_DN:
-                case KEY_LF:
-                case KEY_RT:
-                case 'k':
-                case 'q':
-                case 'f':
-                    input.buf[input.e++ % INPUT_BUF] = c;
-                    input.w = input.e;
-                    wakeup(&input.r);
-                    break;
-                default:
-                    break;
-            }
-        }
-    release(&cons.lock);
-    if(doprocdump) {
-        procdump();  // now call procdump() wo. cons.lock held
-    }
+  int tmpoffset=0;
 
-    int tmpoffset=0;
-
-    acquire(&input.lock);
-    int pos = getcursor();/*
+  acquire(&input.lock);
+  int pos = getcursor();/*
   int i;
     uartprint(input.e);
   uartputc(';');
@@ -658,156 +617,159 @@ consoleintr(int (*getc)(void))
   for (i = input.w; i < input.l; ++i)
     uartputc(input.buf[i]);
   uartputc('\n');*/
-    while((c = getc()) >= 0){
-        if(lastconsolemode != consolemode){
-            lastconsolemode = consolemode;
-            screenHistoryLen = startScreenLine = 0;
+  while((c = getc()) >= 0){
+    if(lastconsolemode != consolemode){
+      lastconsolemode = consolemode;
+      screenHistoryLen = startScreenLine = 0;
+    }
+    if (consolemode == 2){
+      input.buf[input.l++ % INPUT_BUF] = c;
+      input.e = input.l;
+      input.w = input.l;
+      wakeup(&input.r);
+      continue;
+    }
+    switch(c){
+    case C('C'):  // kill current process
+      suspend();
+      break;
+    case C('Z'):
+      //sendsignal(1);//!!!此处注释掉后果未知
+      insertc('\n');
+      break;
+    case C('P'):  // Process listing.
+      procdump();
+      break;
+    case C('U'):  // Kill line.
+      while(input.e != input.w &&
+            input.buf[(input.e-1) % INPUT_BUF] != '\n'){
+        deletec(0);
+      }
+      break;
+    case C('H'): case '\x7f':  // Backspace
+      if(input.e != input.w){
+        deletec(0);
+      }
+      break;
+    case C('A'): 
+      tmpoffset = 1;
+      while((input.e-tmpoffset+1) != input.w &&
+            input.buf[(input.e-tmpoffset) % INPUT_BUF] != '\n'){
+        tmpoffset++;
+      }
+      setcursor(pos + 1 - tmpoffset);
+      break;
+    case C('E'):
+      if(input.e < input.l){
+        setcursor(pos + input.l - input.e);
+      }
+      break;
+    case C('K'):
+      tmpoffset = pos;
+      setcursor(pos + input.l - input.e);
+      while(getcursor() > tmpoffset)
+        deletec(0);
+      break;
+    case C('L'):
+      screenHistoryLen = startScreenLine = 0;
+      memset(crt,0,24*80*sizeof(ushort));
+      outb(CRTPORT, 14);
+      outb(CRTPORT+1, 0);
+      outb(CRTPORT, 15);
+      outb(CRTPORT+1, 0);
+      pos = 0;
+      cgaputc('X');
+      cgaputc('V');
+      cgaputc('6');
+      cgaputc(':');
+      break;
+    case C('B'): case C('D'):  case C('F'):
+    case C('G'): 
+    case C('O'): case C('Q'):
+    case C('R'): case C('S'): case C('T'): case C('V'): case C('W'):
+    case C('X'): case C('Y'):
+
+    case ESC:
+        
+        break;
+    
+    case KEY_HOME: //Home
+        setcursor(pos - input.e);
+        break;
+    case KEY_END: // End
+        setcursor(pos + input.l - input.e);
+        break;
+    case KEY_PGUP:
+        //cprintf("page Up!\n");
+        pageEnd();
+        pageUp();
+        
+        if(shellStatus == SHELL){
+          mainPos = pos;
+          pos = memoPos;
+          shellStatus = MEMO;
         }
-        if (consolemode == 2){
-            input.buf[input.l++ % INPUT_BUF] = c;
-            input.e = input.l;
+        break;
+    case KEY_PGDN:
+        //cprintf("page Down!\n");
+        pageDown();
+        break;
+    case KEY_INS:
+        break;
+    case KEY_DEL:
+        deletec(1);
+        break;
+    case KEY_LF: // Left
+        if (input.e != input.w){
+            setcursor(pos - 1);
+        }
+        break;
+    case KEY_RT: // Right
+        if (input.e < input.l){
+            setcursor(pos + 1);
+        }
+        break;
+    case KEY_UP:
+    case KEY_DN:
+    case 9://tab
+        setcursor(pos + input.l - input.e);
+        insertc(c);
+        input.w = input.l;
+        wakeup(&input.r);
+        break;
+    default: //Insert
+      /*
+      if(c >= 100)
+        insertc('0'+c/100);
+      insertc('0'+c%100/10);
+      insertc('0'+c%10);
+      insertc('A');
+      break;
+      */
+      if(c != 0 && input.l-input.r < INPUT_BUF){
+        c = (c == '\r') ? '\n' : c;
+
+        //Input enter
+        if(c == '\n' || c == C('D') || input.l == input.r + INPUT_BUF - 1){
+            //setcursor(-1);
+            //input.buf[input.l++ % INPUT_BUF] = '\n';
+            //input.e = input.l;
+            setcursor(pos + input.l - input.e);
+            insertc('\n');
             input.w = input.l;
             wakeup(&input.r);
-            continue;
+            break;
         }
-        switch(c){
-            case C('C'):  // kill current process
-            case C('Z'):
-                //sendsignal(1);//!!!此处注释掉后果未知
-                insertc('\n');
-                break;
-            case C('P'):  // Process listing.
-                procdump();
-                break;
-            case C('U'):  // Kill line.
-                while(input.e != input.w &&
-                      input.buf[(input.e-1) % INPUT_BUF] != '\n'){
-                    deletec(0);
-                }
-                break;
-            case C('H'): case '\x7f':  // Backspace
-                if(input.e != input.w){
-                    deletec(0);
-                }
-                break;
-            case C('A'):
-                tmpoffset = 1;
-                while((input.e-tmpoffset+1) != input.w &&
-                      input.buf[(input.e-tmpoffset) % INPUT_BUF] != '\n'){
-                    tmpoffset++;
-                }
-                setcursor(pos + 1 - tmpoffset);
-                break;
-            case C('E'):
-                if(input.e < input.l){
-                    setcursor(pos + input.l - input.e);
-                }
-                break;
-            case C('K'):
-                tmpoffset = pos;
-                setcursor(pos + input.l - input.e);
-                while(getcursor() > tmpoffset)
-                    deletec(0);
-                break;
-            case C('L'):
-                screenHistoryLen = startScreenLine = 0;
-                memset(crt,0,24*80*sizeof(ushort));
-                outb(CRTPORT, 14);
-                outb(CRTPORT+1, 0);
-                outb(CRTPORT, 15);
-                outb(CRTPORT+1, 0);
-                pos = 0;
-                cgaputc('X');
-                cgaputc('V');
-                cgaputc('6');
-                cgaputc(':');
-                break;
-            case C('B'): case C('D'):  case C('F'):
-            case C('G'):
-            case C('O'): case C('Q'):
-            case C('R'): case C('S'): case C('T'): case C('V'): case C('W'):
-            case C('X'): case C('Y'):
-
-            case ESC:
-
-                break;
-
-            case KEY_HOME: //Home
-                setcursor(pos - input.e);
-                break;
-            case KEY_END: // End
-                setcursor(pos + input.l - input.e);
-                break;
-            case KEY_PGUP:
-                //cprintf("page Up!\n");
-                pageEnd();
-                pageUp();
-
-                if(shellStatus == SHELL){
-                    mainPos = pos;
-                    pos = memoPos;
-                    shellStatus = MEMO;
-                }
-                break;
-            case KEY_PGDN:
-                //cprintf("page Down!\n");
-                pageDown();
-                break;
-            case KEY_INS:
-                break;
-            case KEY_DEL:
-                deletec(1);
-                break;
-            case KEY_LF: // Left
-                if (input.e != input.w){
-                    setcursor(pos - 1);
-                }
-                break;
-            case KEY_RT: // Right
-                if (input.e < input.l){
-                    setcursor(pos + 1);
-                }
-                break;
-            case KEY_UP:
-            case KEY_DN:
-            case 9://tab
-                setcursor(pos + input.l - input.e);
-                insertc(c);
-                input.w = input.l;
-                wakeup(&input.r);
-                break;
-            default: //Insert
-                /*
-                if(c >= 100)
-                  insertc('0'+c/100);
-                insertc('0'+c%100/10);
-                insertc('0'+c%10);
-                insertc('A');
-                break;
-                */
-                if(c != 0 && input.l-input.r < INPUT_BUF){
-                    c = (c == '\r') ? '\n' : c;
-
-                    //Input enter
-                    if(c == '\n' || c == C('D') || input.l == input.r + INPUT_BUF - 1){
-                        //setcursor(-1);
-                        //input.buf[input.l++ % INPUT_BUF] = '\n';
-                        //input.e = input.l;
-                        setcursor(pos + input.l - input.e);
-                        insertc('\n');
-                        input.w = input.l;
-                        wakeup(&input.r);
-                        break;
-                    }
-                    else
-                        insertc(c);
-                    /*input.w = input.l;
-                    wakeup(&input.r);*/
-                }
-                break;
-        }
+        else
+            insertc(c);
+            /*input.w = input.l;
+            wakeup(&input.r);*/
+      }
+      break;
     }
-    release(&input.lock);
+  }
+  }
+  release(&input.lock);
 }
 
 int
@@ -886,6 +848,9 @@ struct {
   uint r;  // Read index
   uint w;  // Write index
   uint e;  // Edit index
+
+  uint l;  // Input length
+  uint m;  // Mode 0,INSERT 1,REPLACE
 } inputstore;
 
 int
@@ -912,15 +877,20 @@ inittaskmgr(void)
       crtstore[i] = (crt[i] & 0xff); //将crt的值存入crtstore
       crt[i] = '\0'; //清空屏幕
     }
+    release(&cons.lock);
 
+    acquire(&input.lock);
     for(i = 0; i < INPUT_BUF; i++)
       inputstore.buf[i] = input.buf[i];
     inputstore.r = input.r;
     inputstore.w = input.w;
     inputstore.e = input.e;
+    inputstore.l = input.l;
+    inputstore.m = input.m;
     input.r = input.w = input.e = 0;
+    input.l = input.m = 0; //
 
-    release(&cons.lock);
+    release(&input.lock);
     runtaskmgr = 1;
     return 0;
   }
@@ -941,12 +911,16 @@ closetaskmgr(void)
     outb(CRTPORT+1, posstore);
     for(i = 0; i < 24*80; i++)
       crt[i] = crtstore[i] | 0x700;
+    release(&cons.lock);
+    acquire(&input.lock);
     for(i = 0; i < INPUT_BUF; i++)
       input.buf[i] = inputstore.buf[i];
     input.r = inputstore.r;
     input.w = inputstore.w;
     input.e = inputstore.e;
-	  release(&cons.lock);
+    input.l = inputstore.l;
+    input.m = inputstore.m;
+    release(&input.lock);
     runtaskmgr = 0;
     return 0;
   }
@@ -959,11 +933,13 @@ updscrcont(char *buf, int curline)
 {
   int i;
 
+  acquire(&cons.lock);
   for(i = 0; i < 24*80; i++)
     if(i / 80 == curline)
       crt[i] = (buf[i] & 0xff)| 0x900;
     else
       crt[i] = (buf[i] & 0xff)| 0x700;
+  release(&cons.lock);
   return 0;
 }
 

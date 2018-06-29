@@ -98,6 +98,35 @@ sys_uptime(void)
 }
 
 int
+sys_reparent(void)
+{
+  int pid;
+  int parent;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  if (argint(0, &parent) < 0)
+    return -1;
+
+  reparent(pid,parent);
+  return 0;
+}
+
+int 
+sys_getstate(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+
+  return getstate(pid);
+}
+int
+sys_suspend(void)
+{
+  return suspend();
+}
 sys_inittaskmgr(void)
 {
   return inittaskmgr();
@@ -146,15 +175,16 @@ int sys_nfpgs(void)
 int
 sys_createshm(void)
 {
-    int sig, bytes;
-    if(argint(0, &sig) < 0 || argint(1, &bytes) < 0)
+    int sig, bytes, type;
+    if(argint(0, &sig) < 0 || argint(1, &bytes) < 0 || argint(2, &type) < 0)
     {
         return 0;
     }
-    return createshm(sig,bytes);
+    return createshm(sig, bytes, type);
 }
 
-// return 1 when succeed, return 0 when fail.
+// decrease some sig counts in shmlist
+// return 1 when succeed, return 0 when delelte a sig, return -1 when fail.
 int
 sys_deleteshm(void)
 {
@@ -166,7 +196,8 @@ sys_deleteshm(void)
     return deleteshm(sig);
 }
 
-//return the number of characters actually written in
+// write data from wstr to shared pages with offset "offset"
+// return 0 when succeed and return -1 when failed
 int
 sys_writeshm(void)
 {
@@ -181,7 +212,7 @@ sys_writeshm(void)
     return writeshm(sig, str, num, offset);
 }
 
-// return the number of characters actually read from shmpages
+// return 0 when succeed and return -1 when failed
 int
 sys_readshm(void)
 {
@@ -194,6 +225,12 @@ sys_readshm(void)
         return 0;
     }
     return readshm(sig, str, num, offset);
+}
+
+int
+sys_getsharedpages(void)
+{
+  return getsharedpages();
 }
 
 // Halt (shutdown) the system by sending a special signal to QEMU.
@@ -231,4 +268,10 @@ sys_gettimestamp(void)
     ret += (date.day - 1) * 86400;
     ret += (date.hour * 3600 + date.minute * 60 + date.second);
     return ret;
+}
+
+void
+sys_showproc(void)
+{
+  showproc();
 }

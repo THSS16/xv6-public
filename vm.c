@@ -10,7 +10,14 @@
 #include "debugsw.h"
 #include "spinlock.h"
 
+typedef enum shmblocktype
+{
+  SERIAL,PARALLEL
+}shmblocktype;
+
 #define SWAP_BUF_SIZE (PGSIZE / 4)    // Buffer size when swap.
+#define MAX_SHMNODE_NUM 256    // Max number of shmnode
+
 
 struct shmindex
 {
@@ -25,9 +32,10 @@ struct shmnode
   struct shmindex *addr; //page table physical address
   uint pagenum;//total page numbers in this shared area
   uint count;//how many references from processes are pointed to this sig
-}shmlist[256];
+  shmblocktype type;//serial block or parallel block, serial default
+}shmlist[MAX_SHMNODE_NUM];
 
-
+// Shared memory lock
 struct spinlock kshmlock;
 
 // Set up CPU's kernel segment descriptors.
@@ -231,6 +239,30 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
     else
       n = PGSIZE;
     if(readi(ip, P2V(pa), offset+i, n) != n)
+      return -1;
+  }
+  return 0;
+}
+
+
+// Load a program segment into pgdir.  addr must be page-aligned
+// and the pages from addr to addr+sz must already be mapped.
+int
+loaduvm_from_kernel(pde_t *pgdir, char *addr, char *code_start, char *code_end, uint offset, uint sz) {
+  uint i, pa, n;
+  pte_t *pte;
+
+  if ((uint) addr % PGSIZE != 0)
+    panic("loaduvm: addr must be page aligned");
+  for (i = 0; i < sz; i += PGSIZE) {
+    if ((pte = walkpgdir(pgdir, addr + i, 0)) == 0)
+      panic("loaduvm: address should exist");
+    pa = PTE_ADDR(*pte);
+    if (sz - i < PGSIZE)
+      n = sz - i;
+    else
+      n = PGSIZE;
+    if (readm(code_start, P2V(pa), offset + i, n, code_end) != n)
       return -1;
   }
   return 0;
@@ -908,21 +940,21 @@ void swappage(uint addr)
 // init shared memory
 void initshm(void)
 {
-  for (int i = 0; i < 1024; i++)
+  int i;
+  for (i = 0; i < MAX_SHMNODE_NUM; i++)
   {
     shmlist[i].sig = 0;
     shmlist[i].count = 0;
     shmlist[i].pagenum = 0;
     shmlist[i].addr = 0;
   }
-  cprintf("initshm complete\n");
 }
 
 // increase some sig counts in shmlist
 // add permission to now process
 // if sig does not exist, then create shared physical pages that can cover data of size "bytes".
 // return 1 when succeed create, return 0 when sig already exists, return -1 when fail.
-int createshm(uint sig, uint bytes)
+int createshm(uint sig, uint bytes, int type)
 {
   if (sig == 0)
   {
@@ -931,13 +963,18 @@ int createshm(uint sig, uint bytes)
   }
   if (bytes > 1024 * PGSIZE)
   {
-    cprintf("%d bytes is too big, cannot get that big shared area, createshm failed!\n");
+    cprintf("%d bytes is too big, cannot get that big shared area, createshm failed!\n", bytes);
+    return -1;
+  }
+  if(type !=0 && type != 1)
+  {
+    cprintf("error shmtype: %d\n", type);
     return -1;
   }
   acquire(&kshmlock);
   int firstzero = -1; //first position to insert a new sig
   int i;
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < MAX_SHMNODE_NUM; i++)
   {
     if (firstzero < 0 && shmlist[i].sig == 0)
     {
@@ -947,6 +984,12 @@ int createshm(uint sig, uint bytes)
     {
       break;
     }
+  }
+  if(i != MAX_SHMNODE_NUM && shmlist[i].type != type)// not match
+  {
+    cprintf("shared block type did not match with the former type in this block!\n");
+    release(&kshmlock);
+    return -1;
   }
   struct proc *pr = myproc();
   int j;
@@ -973,7 +1016,7 @@ int createshm(uint sig, uint bytes)
     return -1;
   }
   pr->sig_permit[j] = sig;
-  if (i != 256) //this sig already exists
+  if (i != MAX_SHMNODE_NUM) //this sig already exists
   {
     shmlist[i].count++;
     if (bytes > shmlist[i].pagenum * PGSIZE) //shared area "sig" need extend
@@ -1000,6 +1043,7 @@ int createshm(uint sig, uint bytes)
     shmlist[pos].sig = sig;
     shmlist[pos].count = 1;
     shmlist[pos].pagenum = PGROUNDUP(bytes) / PGSIZE;
+    shmlist[pos].type = type;
     if ((shmlist[pos].addr = (struct shmindex *)kalloc()) == 0)
     {
       cprintf("kalloc failed\n");
@@ -1038,14 +1082,14 @@ int deleteshm(uint sig)
   }
   acquire(&kshmlock);
   int i;
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < MAX_SHMNODE_NUM; i++)
   {
     if (shmlist[i].sig == sig)
     {
       break;
     }
   }
-  if (i == 256) //shared memory pages do not exist
+  if (i == MAX_SHMNODE_NUM) //shared memory pages do not exist
   {
     cprintf("sig does not existed, deleteshm failed!\n");
     release(&kshmlock);
@@ -1070,6 +1114,7 @@ int deleteshm(uint sig)
   shmlist[i].count--;
   if (shmlist[i].count == 0) //delete sig node,free addr
   {
+    shmlist[i].sig = 0;
     int k;
     for (k = 0; k < shmlist[i].pagenum; k++)
     {
@@ -1083,8 +1128,7 @@ int deleteshm(uint sig)
 
 // write data from wstr to shared pages with offset "offset"
 // data length is num
-// return the number of characters actually written to shmpages
-// return -1 if failed
+// return 0 when succeed and return -1 when failed
 int writeshm(uint sig, char *wstr, uint num, uint offset)
 {
   if (sig == 0)
@@ -1093,15 +1137,24 @@ int writeshm(uint sig, char *wstr, uint num, uint offset)
     return -1;
   }
   int i;
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < MAX_SHMNODE_NUM; i++)
   {
     if (shmlist[i].sig == sig)
       break;
   }
-  if (i == 256) //does not exist
+  if (i == MAX_SHMNODE_NUM) //does not exist
   {
     cprintf("shared area %d has not been created, writeshm failed!\n", sig);
     return -1;
+  }
+  int serial_mark = 0;
+  if (shmlist[i].type == SERIAL)
+  {
+    serial_mark = 1;
+  }
+  if(serial_mark)
+  {
+    acquire(&kshmlock);
   }
   struct proc *pr = myproc();
   int j;
@@ -1115,12 +1168,20 @@ int writeshm(uint sig, char *wstr, uint num, uint offset)
   if (j == MAX_SIG_PER_PROC) //not found
   {
     cprintf("this process does not have permission to access shared area %d, writeshm failed!\n", sig);
+    if(serial_mark)
+    {
+      release(&kshmlock);
+    }
     return -1;
   }
 
   if (num > PGSIZE * shmlist[i].pagenum - offset) //overflow
   {
     cprintf("write area overflow, not enough space to write in %d bytes, writeshm failed!\n", num);
+    if(serial_mark)
+    {
+      release(&kshmlock);
+    }
     return -1;
   }
 
@@ -1135,12 +1196,15 @@ int writeshm(uint sig, char *wstr, uint num, uint offset)
       offs = 0;
     }
   }
+  if(serial_mark)
+  {
+    release(&kshmlock);
+  }
   return 0;
 }
 
 // read data to rstr from shared pages with offset "offset"
-// return the number of characters actually read from shmpages
-// return -1 if failed
+// return 0 when succeed and return -1 when failed
 int readshm(uint sig, char *rstr, uint num, uint offset)
 {
   if (sig == 0)
@@ -1149,17 +1213,22 @@ int readshm(uint sig, char *rstr, uint num, uint offset)
     return -1;
   }
   int i;
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < MAX_SHMNODE_NUM; i++)
   {
     if (shmlist[i].sig == sig)
       break;
   }
-  if (i == 256) //does not exist
+  if (i == MAX_SHMNODE_NUM) //does not exist
   {
     cprintf("shared area %d has not been created, readshm failed!\n", sig);
     return -1;
   }
-
+  int serial_mark = 0;
+  if(shmlist[i].type == SERIAL)
+  {
+    serial_mark = 1;
+    acquire(&kshmlock);
+  }
   struct proc *pr = myproc();
   int j;
   for (j = 0; j < MAX_SIG_PER_PROC; j++)
@@ -1172,6 +1241,8 @@ int readshm(uint sig, char *rstr, uint num, uint offset)
   if (j == MAX_SIG_PER_PROC) //not found
   {
     cprintf("this process does not have permission to access shared area %d, readshm failed!\n", sig);
+    if(serial_mark)
+      release(&kshmlock);
     return -1;
   }
 
@@ -1191,5 +1262,18 @@ int readshm(uint sig, char *rstr, uint num, uint offset)
       offs = 0;
     }
   }
+  if(serial_mark)
+      release(&kshmlock);
   return 0;
+}
+
+int getsharedpages(void)
+{
+  int pgnum = 0;
+  int i = 0;
+  for(;i<MAX_SHMNODE_NUM;i++)
+  {
+    pgnum += shmlist[i].pagenum;
+  }
+  return pgnum;
 }

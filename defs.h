@@ -35,6 +35,7 @@ void			datetime(void*);//时间函数
 
 // exec.c
 int             exec(char*, char**);
+int             readm(char *, char *, uint, uint, const char *);
 
 // file.c
 struct file*    filealloc(void);
@@ -139,6 +140,9 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void            reparent(int,int);
+int             getstate(int);
+int             suspend(void);
 int             getprocinfo(int*, char(*)[16], int*, uint*);
 void            swaptableinit(void);
 int             swapstab_growpage(struct proc *pr);
@@ -218,10 +222,13 @@ void            clearpteu(pde_t *pgdir, char *uva);
 void            pagefault(uint err_code);
 void            swappage(uint);
 void            initshm(void);
-int             createshm(uint sig, uint bytes);
+int             createshm(uint sig, uint bytes, int type);
 int             deleteshm(uint sig);
 int             readshm(uint sig, char* rstr, uint num, uint offset);
 int             writeshm(uint sig, char* wstr, uint num, uint offset);
+int             getsharedpages(void);
+void            showproc(void);
+int             loaduvm_from_kernel(pde_t *, char *, char *, char *, uint, uint);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
