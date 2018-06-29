@@ -21,12 +21,13 @@
 
 #include "history.h"
 #include "var_in_kernel.h"
+#include "syscall.h"
 
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
 //Edit console output
-int 
+int
 sys_setconsole(void)
 {
     int pos, ch, color, cursor, mode;
@@ -52,7 +53,6 @@ sys_setconsole(void)
     consolemode = mode;
     return 0;
 }
-
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -279,7 +279,7 @@ int
 sys_unlink(void)
 {
   char *path;
-  
+
   if(argstr(0, &path) < 0)
     return -1;
 
@@ -379,12 +379,13 @@ sys_open(void)
   f->type = FD_INODE;
   f->ip = ip;
   if(omode & O_ADD){
-    f->off = ip->size;  
+    f->off = ip->size;
   }else{
     f->off = 0;
   }
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+  f->showable = (omode & O_SHOW);
   return fd;
 }
 
@@ -498,7 +499,7 @@ void updatecwdname(char * cwdname, char * path)
       break;
     }
     if(endflag)
-      break; 
+      break;
   }
 }
 int
@@ -507,7 +508,7 @@ sys_chdir(void)
   char *path;
   struct inode *ip;
   struct proc *curproc = myproc();
-  
+
   begin_op();
   if(argstr(0, &path) < 0 || (ip = namei(path)) == 0){
     end_op();
@@ -577,51 +578,6 @@ sys_pipe(void)
   return 0;
 }
 
-//操作文件读取位置
-int sys_lseek(void) {
-	int fd;
-	int offset;
-	int base;
-	int newoff = 0;
-	int zerosize, i;
-	char *zeroed, *z;
-
-	struct file *f;
-
-	if ((argfd(0, &fd, &f)<0) ||
-		(argint(1, &offset)<0) || (argint(2, &base)<0))
-			return 0;
-
-	if( base == SEEK_SET) {
-		newoff = offset;
-	}
-
-	if (base == SEEK_CUR)
-		newoff = f->off + offset;
-
-	if (base == SEEK_END)
-		newoff = f->ip->size + offset;
-
-	if (newoff < 0)
-		return 0;
-
-	if (newoff > f->ip->size){
-		zerosize = newoff - f->ip->size;
-		zeroed = kalloc();
-		z = zeroed;
-		for (i = 0; i < PGSIZE; i++)
-			*z++ = 0;
-		while (zerosize > 0){
-			filewrite(f, zeroed, zerosize);
-			zerosize -= PGSIZE;
-		}
-		kfree(zeroed);
-	}
-
-	f->off = newoff;
-	return newoff;
-}
-
 int
 sys_getcwd(void)
 {
@@ -632,3 +588,209 @@ sys_getcwd(void)
   return 0;
 }
 
+
+int
+sys_hide(void)
+{
+  struct inode *ip, *dp;
+  struct dirent de;
+  char name[DIRSIZ], *path;
+  uint off;
+
+  if(argstr(0, &path) < 0)
+    return -1;
+
+  begin_op();
+  if((dp = nameiparent(path, name)) == 0){
+    end_op();
+    return -1;
+  }
+
+  ilock(dp);
+
+  // Cannot unlink "." or "..".
+  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
+    goto bad;
+
+  if((ip = dirlookup(dp, name, &off)) == 0)
+    goto bad;
+  ilock(ip);
+
+  if(ip->nlink < 1)
+    panic("unlink: nlink < 1");
+  if(ip->type == T_DIR && !isdirempty(ip)){
+    iunlockput(ip);
+    goto bad;
+  }
+
+
+
+
+  if(ip->type == T_DIR){
+    if(dp->showable != O_HIDE){  //if it is not hided
+      dp->showable = O_HIDE;  //hide it
+      cprintf(name);
+      cprintf(" delete completed(hide)\n");
+    }
+    else{  //it has already hided
+      memset(&de, 0, sizeof(de));
+      if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+        panic("unlink: writei");
+      dp->nlink--;  //hide change to unlink
+      cprintf(name);
+      cprintf(" delete completed(unlink)\n");
+    }
+    iupdate(dp);
+  }
+  iunlockput(dp);
+  if(ip->showable != O_HIDE){  //if it is not hided
+    ip->showable = O_HIDE;  //hide it
+    cprintf(name);
+      cprintf(" delete completed(hide)\n");
+  }
+  else{  //it has already hided
+    memset(&de, 0, sizeof(de));
+    if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+      panic("unlink: writei");
+    ip->nlink--;  //hide change to unlink
+    cprintf(name);
+    cprintf(" delete completed(unlink)\n");
+  }
+
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+
+  return 0;
+
+bad:
+  iunlockput(dp);
+  end_op();
+  return -1;
+}
+
+// Create the path new as a link to the same inode as old.
+int
+sys_show(void)
+{
+  struct inode *ip, *dp;
+  struct dirent de;
+  char name[DIRSIZ], *path;
+  uint off;
+
+  if(argstr(0, &path) < 0)
+    return -1;
+
+  begin_op();
+  if((dp = nameiparent(path, name)) == 0){
+    end_op();
+    return -1;
+  }
+
+  ilock(dp);
+
+  // Cannot hide "." or "..".
+  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
+    goto bad;
+
+  if((ip = dirlookup(dp, name, &off)) == 0)
+{
+    goto bad;
+}
+
+ ilock(ip);
+
+  if(ip->nlink < 1)
+    panic("hide: nlink < 1");
+  if(ip->type == T_DIR && !isdirempty(ip)){
+    iunlockput(ip);
+    goto bad;
+  }
+
+  memset(&de, 0, sizeof(de));
+
+  if(ip->type == T_DIR){
+    if(dp->showable != O_SHOW){  //if it is not showed
+      dp->showable = O_SHOW;  //show it
+      cprintf(name);
+      cprintf(" refresh completed\n");
+    }
+    iupdate(dp);
+  }
+  iunlockput(dp);
+  if(ip->showable != O_SHOW){  //if it is not showed
+    ip->showable = O_SHOW;  //show it
+    cprintf(name);
+    cprintf(" refresh completed\n");
+  }
+
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+
+  return 0;
+
+bad:
+  iunlockput(dp);
+  end_op();
+  return -1;
+}
+
+
+int sys_isatty(void) {
+  int fd,res=0;
+  struct file* f;
+  if(argfd(0, &fd, &f) < 0) {
+    return 0;
+  }
+  if(f->type == FD_INODE) {
+      ilock(f->ip);
+      res = f->ip->type == T_DEV;//must be console
+      iunlock(f->ip);
+  }
+  return res;
+}
+
+// lseek code derived from https://github.com/ctdk/xv6
+int sys_lseek(void)
+{
+  int fd;
+  int offset;
+  int base;
+  int newoff=-1;
+  int zerosize, i;
+  char *zeroed, *z;
+
+  struct file *f;
+
+  if ((argfd(0, &fd, &f)<0) ||
+      (argint(1, &offset)<0) || (argint(2, &base)<0))
+    return(EINVAL);
+
+  if( base == SEEK_SET) {
+    newoff = offset;
+  } else if (base == SEEK_CUR) {
+    newoff = f->off + offset;
+  } else if (base == SEEK_END) {
+    newoff = f->ip->size + offset;
+  }
+
+  if (newoff < 0)
+    return EINVAL;
+
+  if (newoff > f->ip->size){
+    zerosize = newoff - f->ip->size;
+    zeroed = kalloc();
+    z = zeroed;
+    for (i = 0; i < PGSIZE; i++)
+      *z++ = 0;
+    while (zerosize > 0){
+      filewrite(f, zeroed, zerosize);
+      zerosize -= PGSIZE;
+    }
+    kfree(zeroed);
+  }
+
+  f->off = (uint) newoff;
+  return newoff;
+}

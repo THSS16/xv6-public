@@ -1,6 +1,7 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "fcntl.h"
 #include "fs.h"
 
 char*
@@ -43,7 +44,8 @@ ls(char *path)
 
   switch(st.type){
   case T_FILE:
-    printf(1, "%s %d %d %d\n", fmtname(path), st.type, st.ino, st.size);
+    if(st.showable!=O_HIDE)
+      printf(1, "%s %d %d %d\n", fmtname(path), st.type, st.ino, st.size);
     break;
 
   case T_DIR:
@@ -63,7 +65,7 @@ ls(char *path)
         printf(1, "ls: cannot stat %s\n", buf);
         continue;
       }
-      if (fmtname(buf)[0] != '.'){
+      if (fmtname(buf)[0] != '.'&&st.showable!=O_HIDE){
         printf(1, "%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
       }
     }
@@ -163,3 +165,4 @@ main(int argc, char *argv[])
     ls(argv[i]);
   exit();
 }
+

@@ -6,6 +6,7 @@ struct file {
   struct pipe *pipe;
   struct inode *ip;
   uint off;
+  char showable;
 };
 
 
@@ -22,6 +23,7 @@ struct inode {
   short major;
   short minor;
   short nlink;
+  char showable;
   uint size;
   uint addrs[NDIRECT+1];
 };
@@ -36,3 +38,8 @@ struct devsw {
 extern struct devsw devsw[];
 
 #define CONSOLE 1
+
+// lseek defines
+#define SEEK_SET        0
+#define SEEK_CUR        1
+#define SEEK_END        2
