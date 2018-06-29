@@ -119,6 +119,9 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_reparent(void);
+extern int sys_getstate(void);
+extern int sys_suspend(void);
 extern int sys_nfpgs(void);
 extern int sys_writeshm(void);
 extern int sys_readshm(void);
@@ -165,6 +168,9 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_reparent] sys_reparent,
+[SYS_getstate] sys_getstate,
+[SYS_suspend] sys_suspend,
 [SYS_nfpgs]   sys_nfpgs,
 [SYS_createshm] sys_createshm,
 [SYS_deleteshm] sys_deleteshm,

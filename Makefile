@@ -197,6 +197,10 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
+	_autowriter\
+	_recorder\
+	_jobs\
+	_hello\
 	_taskmgr\
 	_cowtest\
 	_lalloctest\
@@ -305,6 +309,7 @@ EXTRA=\
 	printf.c umalloc.c cowtest.c lalloctest.c npptest.c sagtest.c\
 	pgswptest.c shmtest.c vmstat.c\
 	printf.c umalloc.c mv.c touch.c cp.c head.c tail.c splice.c\
+	jobs.c autowriter.c recorder.c hello.c\
 	history.c shutdown.c delete.c refresh.c showdeled.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\

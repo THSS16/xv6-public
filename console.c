@@ -631,6 +631,8 @@ consoleintr(int (*getc)(void))
     }
     switch(c){
     case C('C'):  // kill current process
+      suspend();
+      break;
     case C('Z'):
       //sendsignal(1);//!!!此处注释掉后果未知
       insertc('\n');

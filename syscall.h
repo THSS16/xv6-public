@@ -39,6 +39,9 @@
 #define SYS_getprocinfo  43
 #define SYS_updscrcont   44
 
+#define SYS_reparent 50
+#define SYS_getstate 51
+#define SYS_suspend 52
 #define SYS_gettime 47
 #define SYS_isatty 48
 #define SYS_lseek 49

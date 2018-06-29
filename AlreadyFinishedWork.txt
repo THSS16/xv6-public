@@ -28,3 +28,9 @@
 5、实现history (N)命令
 6、实现history -c 清空命令
 
+丁润语：
+1、改进了&使后台命令被存储
+2、实现了ctrl+C用于挂起当前正在前台运行的程序
+3、实现bg、jobs命令
+4、改进kill，使其可以通过%杀死后台进程
+5、添加用于演示的recorder、autowriter
