@@ -903,9 +903,9 @@ showproc(void)
   struct proc* p;
   for(p=ptable.proc;p<&ptable.proc[NPROC];p++)
   {
-    if(p->state==RUNNING || p->state==RUNNABLE)
+    if(p->state==RUNNING || p->state==RUNNABLE || p->state==SLEEPING)
     {
-      cprintf("%s\t%d\t%d",p->name,p->sz,p->stack_size);
+      cprintf("%s\t%d\t%d\n",p->name,p->sz,p->stack_size);
     }
   }
 }
