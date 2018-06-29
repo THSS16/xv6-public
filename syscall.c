@@ -19,7 +19,10 @@ fetchint(uint addr, int *ip)
 {
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->sz || addr+4 > curproc->sz)
+  // Check if addr is valid.
+  if ((addr >= curproc->sz && addr < curproc->tf->esp) ||
+      (addr + 4 > curproc->sz && addr < curproc->tf->esp) ||
+      addr + 4 > USERTOP)
     return -1;
   *ip = *(int*)(addr);
   return 0;
@@ -34,10 +37,17 @@ fetchstr(uint addr, char **pp)
   char *s, *ep;
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->sz)
+  if ((addr >= curproc->sz && addr < curproc->tf->esp) || (addr > USERTOP))
     return -1;
-  *pp = (char*)addr;
-  ep = (char*)curproc->sz;
+  *pp = (char *)addr;
+
+  if (addr < curproc->sz)
+    ep = (char *)curproc->sz;
+  else if (addr >= curproc->tf->esp && addr < USERTOP)
+    ep = (char *)USERTOP;
+  else
+    return -1;
+
   for(s = *pp; s < ep; s++){
     if(*s == 0)
       return s - *pp;
@@ -63,9 +73,15 @@ argptr(int n, char **pp, int size)
  
   if(argint(n, &i) < 0)
     return -1;
-  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
+  if ((uint)i < PGSIZE || // Null pointer protection.
+      (uint)i > USERTOP ||
+      ((uint)i >= curproc->sz && (uint)i < USERTOP - curproc->stack_size) ||
+      ((uint)(i + size) > curproc->sz && i + size < USERTOP - curproc->stack_size) ||
+      (uint)(i + size) > USERTOP ||
+      (((uint)i < curproc->sz) && (uint)(i + size) >= USERTOP - curproc->stack_size))
     return -1;
-  *pp = (char*)i;
+
+  *pp = (char *)i;
   return 0;
 }
 
@@ -103,6 +119,34 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_reparent(void);
+extern int sys_getstate(void);
+extern int sys_suspend(void);
+extern int sys_nfpgs(void);
+extern int sys_writeshm(void);
+extern int sys_readshm(void);
+extern int sys_createshm(void);
+extern int sys_deleteshm(void);
+extern int sys_getsharedpages(void);
+extern int sys_showproc(void);
+
+extern int sys_setconsole(void);
+extern int sys_clearc(void);
+extern int sys_insertc(void);
+extern int sys_shutdown(void);
+extern int sys_lseek(void);
+extern int sys_gettimestamp(void);
+extern int sys_getcwd(void);
+extern int sys_inittaskmgr(void);
+extern int sys_closetaskmgr(void);
+extern int sys_getprocinfo(void);
+extern int sys_updscrcont(void);
+extern int sys_hide(void);
+extern int sys_show(void);
+extern int sys_gettime(void);
+extern int sys_isatty(void);
+extern int sys_lseek(void);
+
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,6 +170,31 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_reparent] sys_reparent,
+[SYS_getstate] sys_getstate,
+[SYS_suspend] sys_suspend,
+[SYS_nfpgs]   sys_nfpgs,
+[SYS_createshm] sys_createshm,
+[SYS_deleteshm] sys_deleteshm,
+[SYS_readshm] sys_readshm,
+[SYS_writeshm] sys_writeshm,
+[SYS_setconsole]  sys_setconsole,
+[SYS_clearc]        sys_clearc,
+[SYS_insertc]       sys_insertc,
+[SYS_shutdown]    sys_shutdown,
+[SYS_gettimestamp]   sys_gettimestamp,
+[SYS_getcwd]    sys_getcwd,
+[SYS_inittaskmgr]   sys_inittaskmgr,
+[SYS_closetaskmgr]  sys_closetaskmgr,
+[SYS_getprocinfo]   sys_getprocinfo,
+[SYS_updscrcont]    sys_updscrcont,
+[SYS_hide]    sys_hide,
+[SYS_show]    sys_show,
+[SYS_gettime] sys_gettime,
+[SYS_isatty]  sys_isatty,
+[SYS_lseek]   sys_lseek,
+[SYS_getsharedpages] sys_getsharedpages,
+[SYS_showproc] sys_showproc
 };
 
 void

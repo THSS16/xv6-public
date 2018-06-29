@@ -15,6 +15,44 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "memlayout.h"
+#include "x86.h"
+#include "date.h"
+
+#include "history.h"
+#include "var_in_kernel.h"
+#include "syscall.h"
+
+#define CRTPORT 0x3d4
+static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
+
+//Edit console output
+int
+sys_setconsole(void)
+{
+    int pos, ch, color, cursor, mode;
+    if (argint(0, &pos) < 0 || argint(1, &ch) < 0)
+        return -1;
+    if (argint(2, &color) < 0)
+        color = 0x0700;
+    if (argint(3, &cursor) < 0)
+        cursor = -1;
+    if (argint(4, &mode) < 0)
+        mode = 0;
+    if (0 <= pos && pos < 80 * 25){//屏幕输出范围在[0~80 x 25)
+        crt[pos] = (ch & 0xff) | color;
+    }
+    if (cursor >= 0){
+        outb(CRTPORT, 14);
+        outb(CRTPORT+1, cursor >> 8);
+        outb(CRTPORT, 15);
+        outb(CRTPORT+1, cursor);
+    }
+    if (mode < 0)
+        mode = 0;
+    consolemode = mode;
+    return 0;
+}
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -165,7 +203,7 @@ bad:
 }
 
 // Is the directory dp empty except for "." and ".." ?
-static int
+int
 isdirempty(struct inode *dp)
 {
   int off;
@@ -180,20 +218,16 @@ isdirempty(struct inode *dp)
   return 1;
 }
 
-//PAGEBREAK!
-int
-sys_unlink(void)
+int kunlink(char* path)
 {
   struct inode *ip, *dp;
   struct dirent de;
-  char name[DIRSIZ], *path;
+  char name[DIRSIZ];
   uint off;
 
-  if(argstr(0, &path) < 0)
-    return -1;
-
   begin_op();
-  if((dp = nameiparent(path, name)) == 0){
+  if ((dp = nameiparent(path, name)) == 0)
+  {
     end_op();
     return -1;
   }
@@ -201,24 +235,26 @@ sys_unlink(void)
   ilock(dp);
 
   // Cannot unlink "." or "..".
-  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
+  if (namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
     goto bad;
 
-  if((ip = dirlookup(dp, name, &off)) == 0)
+  if ((ip = dirlookup(dp, name, &off)) == 0)
     goto bad;
   ilock(ip);
 
-  if(ip->nlink < 1)
+  if (ip->nlink < 1)
     panic("unlink: nlink < 1");
-  if(ip->type == T_DIR && !isdirempty(ip)){
+  if (ip->type == T_DIR && !isdirempty(ip))
+  {
     iunlockput(ip);
     goto bad;
   }
 
   memset(&de, 0, sizeof(de));
-  if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+  if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
     panic("unlink: writei");
-  if(ip->type == T_DIR){
+  if (ip->type == T_DIR)
+  {
     dp->nlink--;
     iupdate(dp);
   }
@@ -238,7 +274,19 @@ bad:
   return -1;
 }
 
-static struct inode*
+//PAGEBREAK!
+int
+sys_unlink(void)
+{
+  char *path;
+
+  if(argstr(0, &path) < 0)
+    return -1;
+
+  return kunlink(path);
+}
+
+struct inode*
 create(char *path, short type, short major, short minor)
 {
   uint off;
@@ -265,6 +313,9 @@ create(char *path, short type, short major, short minor)
   ip->major = major;
   ip->minor = minor;
   ip->nlink = 1;
+  rtcdate date;
+  datetime(&date);
+  ip->ctime = dateToTimestamp(&date);
   iupdate(ip);
 
   if(type == T_DIR){  // Create . and .. entries.
@@ -327,9 +378,14 @@ sys_open(void)
 
   f->type = FD_INODE;
   f->ip = ip;
-  f->off = 0;
+  if(omode & O_ADD){
+    f->off = ip->size;
+  }else{
+    f->off = 0;
+  }
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+  f->showable = (omode & O_SHOW);
   return fd;
 }
 
@@ -369,13 +425,90 @@ sys_mknod(void)
   return 0;
 }
 
+
+void updatecwdname(char * cwdname, char * path)
+{
+  while(1)
+  {
+    int endflag = 0;
+    switch(*path)
+    {
+      case '/':
+        safestrcpy(cwdname,path,sizeof(path));
+        endflag = 1;
+      break;
+      case '.':
+        if(path[1] == '.')
+        {
+          char * slash = cwdname;
+          char * p = cwdname;
+          while(*p)
+          {
+            if(*p == '/')
+              slash = p;
+            p++;
+          }
+          p = slash;
+          if(p == cwdname)
+            p++;
+          while(*p)
+          {
+            *p = 0;
+            p++;
+          }
+          endflag = 1;
+          if(path[2] == '/')
+          {
+            path += 3;
+            endflag = 0;
+          }
+        }
+        else if(path[1] == '/')
+        {
+          path += 2;
+        }
+        else
+        {
+          endflag = 1;
+        }
+      break;
+      default:
+      {
+        char * p = cwdname;
+        while(*p)
+        {
+          p++;
+        }
+        p--;
+        if(*p == '/')
+        {
+          p++;
+          safestrcpy(p,path,sizeof(path));
+          //printf(2,"%s %s\n",cwdname,path);
+        }
+        else
+        {
+          p++;
+          *p = '/';
+          p++;
+          safestrcpy(p,path,sizeof(path));
+          //printf(2,"%s %s\n",cwdname,path);
+        }
+        endflag = 1;
+      }
+      break;
+    }
+    if(endflag)
+      break;
+  }
+}
 int
 sys_chdir(void)
 {
   char *path;
   struct inode *ip;
   struct proc *curproc = myproc();
-  
+
   begin_op();
   if(argstr(0, &path) < 0 || (ip = namei(path)) == 0){
     end_op();
@@ -391,6 +524,7 @@ sys_chdir(void)
   iput(curproc->cwd);
   end_op();
   curproc->cwd = ip;
+  updatecwdname(curproc->cwdname,path);
   return 0;
 }
 
@@ -442,4 +576,221 @@ sys_pipe(void)
   fd[0] = fd0;
   fd[1] = fd1;
   return 0;
+}
+
+int
+sys_getcwd(void)
+{
+  char * cwd;
+  if(argstr(0, &cwd) < 0)
+    return -1;
+  safestrcpy(cwd,myproc()->cwdname,sizeof(myproc()->cwdname));
+  return 0;
+}
+
+
+int
+sys_hide(void)
+{
+  struct inode *ip, *dp;
+  struct dirent de;
+  char name[DIRSIZ], *path;
+  uint off;
+
+  if(argstr(0, &path) < 0)
+    return -1;
+
+  begin_op();
+  if((dp = nameiparent(path, name)) == 0){
+    end_op();
+    return -1;
+  }
+
+  ilock(dp);
+
+  // Cannot unlink "." or "..".
+  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
+    goto bad;
+
+  if((ip = dirlookup(dp, name, &off)) == 0)
+    goto bad;
+  ilock(ip);
+
+  if(ip->nlink < 1)
+    panic("unlink: nlink < 1");
+  if(ip->type == T_DIR && !isdirempty(ip)){
+    iunlockput(ip);
+    goto bad;
+  }
+
+
+
+
+  if(ip->type == T_DIR){
+    if(dp->showable != O_HIDE){  //if it is not hided
+      dp->showable = O_HIDE;  //hide it
+      cprintf(name);
+      cprintf(" delete completed(hide)\n");
+    }
+    else{  //it has already hided
+      memset(&de, 0, sizeof(de));
+      if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+        panic("unlink: writei");
+      dp->nlink--;  //hide change to unlink
+      cprintf(name);
+      cprintf(" delete completed(unlink)\n");
+    }
+    iupdate(dp);
+  }
+  iunlockput(dp);
+  if(ip->showable != O_HIDE){  //if it is not hided
+    ip->showable = O_HIDE;  //hide it
+    cprintf(name);
+      cprintf(" delete completed(hide)\n");
+  }
+  else{  //it has already hided
+    memset(&de, 0, sizeof(de));
+    if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+      panic("unlink: writei");
+    ip->nlink--;  //hide change to unlink
+    cprintf(name);
+    cprintf(" delete completed(unlink)\n");
+  }
+
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+
+  return 0;
+
+bad:
+  iunlockput(dp);
+  end_op();
+  return -1;
+}
+
+// Create the path new as a link to the same inode as old.
+int
+sys_show(void)
+{
+  struct inode *ip, *dp;
+  struct dirent de;
+  char name[DIRSIZ], *path;
+  uint off;
+
+  if(argstr(0, &path) < 0)
+    return -1;
+
+  begin_op();
+  if((dp = nameiparent(path, name)) == 0){
+    end_op();
+    return -1;
+  }
+
+  ilock(dp);
+
+  // Cannot hide "." or "..".
+  if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
+    goto bad;
+
+  if((ip = dirlookup(dp, name, &off)) == 0)
+{
+    goto bad;
+}
+
+ ilock(ip);
+
+  if(ip->nlink < 1)
+    panic("hide: nlink < 1");
+  if(ip->type == T_DIR && !isdirempty(ip)){
+    iunlockput(ip);
+    goto bad;
+  }
+
+  memset(&de, 0, sizeof(de));
+
+  if(ip->type == T_DIR){
+    if(dp->showable != O_SHOW){  //if it is not showed
+      dp->showable = O_SHOW;  //show it
+      cprintf(name);
+      cprintf(" refresh completed\n");
+    }
+    iupdate(dp);
+  }
+  iunlockput(dp);
+  if(ip->showable != O_SHOW){  //if it is not showed
+    ip->showable = O_SHOW;  //show it
+    cprintf(name);
+    cprintf(" refresh completed\n");
+  }
+
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+
+  return 0;
+
+bad:
+  iunlockput(dp);
+  end_op();
+  return -1;
+}
+
+
+int sys_isatty(void) {
+  int fd,res=0;
+  struct file* f;
+  if(argfd(0, &fd, &f) < 0) {
+    return 0;
+  }
+  if(f->type == FD_INODE) {
+      ilock(f->ip);
+      res = f->ip->type == T_DEV;//must be console
+      iunlock(f->ip);
+  }
+  return res;
+}
+
+// lseek code derived from https://github.com/ctdk/xv6
+int sys_lseek(void)
+{
+  int fd;
+  int offset;
+  int base;
+  int newoff=-1;
+  int zerosize, i;
+  char *zeroed, *z;
+
+  struct file *f;
+
+  if ((argfd(0, &fd, &f)<0) ||
+      (argint(1, &offset)<0) || (argint(2, &base)<0))
+    return(EINVAL);
+
+  if( base == SEEK_SET) {
+    newoff = offset;
+  } else if (base == SEEK_CUR) {
+    newoff = f->off + offset;
+  } else if (base == SEEK_END) {
+    newoff = f->ip->size + offset;
+  }
+
+  if (newoff < 0)
+    return EINVAL;
+
+  if (newoff > f->ip->size){
+    zerosize = newoff - f->ip->size;
+    zeroed = kalloc();
+    z = zeroed;
+    for (i = 0; i < PGSIZE; i++)
+      *z++ = 0;
+    while (zerosize > 0){
+      filewrite(f, zeroed, zerosize);
+      zerosize -= PGSIZE;
+    }
+    kfree(zeroed);
+  }
+
+  f->off = (uint) newoff;
+  return newoff;
 }

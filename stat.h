@@ -8,4 +8,6 @@ struct stat {
   uint ino;    // Inode number
   short nlink; // Number of links to file
   uint size;   // Size of file in bytes
+  char showable;
+  uint ctime;  // 文件创建时间
 };

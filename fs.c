@@ -20,9 +20,42 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
+#include "fcntl.h"
+#include "debugsw.h"
+#include "date.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
+
+/*
+*函数功能：实时时钟转化为uint
+*历史来源：三字班方案二代码
+*整合作者：程嘉梁
+*整合时间：2018/04/16
+*/
+uint dateToTimestamp(rtcdate* date)
+{
+  uint ret = 946684800; //utc+0 2000/1/1 0:0:0 946684800
+  int days[]={31,28,31,30,31,30,31,31,30,31,30,31};
+  int year4num = (date->year - 2000) / 4;
+  ret += year4num*(365*4+1)*86400;
+  int yearfor4 = date->year - year4num * 4 - 2000;
+  if(yearfor4>0)
+  {
+    ret += 366 * 86400;
+    yearfor4--;
+    ret += yearfor4 * 365 * 86400;
+  }
+  else
+    days[1] = 29;
+  int i;
+  for(i = 1; i < date->month; i++)
+    ret += days[i-1]*86400;
+  ret += (date->day - 1) * 86400;
+  ret += (date->hour * 3600 + date->minute * 60 + date->second);
+  return ret;
+}
+
 // there should be one superblock per disk device, but we run with
 // only one device
 struct superblock sb; 
@@ -205,6 +238,7 @@ ialloc(uint dev, short type)
     if(dip->type == 0){  // a free inode
       memset(dip, 0, sizeof(*dip));
       dip->type = type;
+      dip->showable = O_SHOW;
       log_write(bp);   // mark it allocated on the disk
       brelse(bp);
       return iget(dev, inum);
@@ -231,6 +265,9 @@ iupdate(struct inode *ip)
   dip->minor = ip->minor;
   dip->nlink = ip->nlink;
   dip->size = ip->size;
+
+  dip->showable = ip->showable;
+  dip->ctime = ip->ctime;//更新时间参数
   memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
   log_write(bp);
   brelse(bp);
@@ -304,6 +341,8 @@ ilock(struct inode *ip)
     ip->minor = dip->minor;
     ip->nlink = dip->nlink;
     ip->size = dip->size;
+    ip->showable = dip->showable;
+    ip->ctime = dip->ctime;//添加时间参数
     memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
     brelse(bp);
     ip->valid = 1;
@@ -445,6 +484,8 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
+  st->showable = ip->showable;
+  st->ctime = ip->ctime;//拷贝时间变量
 }
 
 //PAGEBREAK!
@@ -506,8 +547,14 @@ writei(struct inode *ip, char *src, uint off, uint n)
 
   if(n > 0 && off > ip->size){
     ip->size = off;
-    iupdate(ip);
   }
+  
+  //设置文件节点时间
+  rtcdate date;
+  datetime(&date);
+  ip->ctime = dateToTimestamp(&date);
+
+  iupdate(ip);
   return n;
 }
 
@@ -668,4 +715,114 @@ struct inode*
 nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
+}
+
+int swapalloc(struct proc *p)
+{
+  if (SHOW_SWAPALLOC_ENTER)
+    cprintf("Entering swapalloc.\n");
+
+  int no;
+  for (no = 0; no < MAX_SWAPFILES; no++)
+  {
+    char path[20];
+    struct inode *in;
+
+    memmove(path, "./.swap", 7);
+    itoa(no, path + 7);
+    itoa(p->pid, path + 8);
+
+    begin_op();
+    in = create(path, T_FILE, 0, 0);
+    iunlock(in);
+
+    p->swapfile[no] = filealloc();
+    if (p->swapfile[no] == 0)
+      panic("[ERROR] No swapfile.");
+
+    p->swapfile[no]->ip = in;
+    p->swapfile[no]->type = FD_INODE;
+    p->swapfile[no]->off = 0;
+    p->swapfile[no]->readable = O_WRONLY;
+    p->swapfile[no]->writable = O_RDWR;
+
+    end_op();
+  }
+
+  if (SHOW_SWAPALLOC_LEAVE)
+    cprintf("Leaving swapalloc.\n");
+
+  return 0;
+}
+
+int swapdealloc(struct proc *p)
+{
+  if (SHOW_SWAPDEALLOC_ENTER)
+    cprintf("Entering swapdealloc.\n");
+
+  int no;
+  int res = 0;
+  for (no = 0; no < MAX_SWAPFILES; no++)
+  {
+    char path[20];
+
+    memmove(path, "./.swap", 7);
+    itoa(no, path + 7);
+    itoa(p->pid, path + 8);
+
+    if (0 == p->swapfile[no])
+    {
+      res = -1;
+      continue;
+    }
+    fileclose(p->swapfile[no]);
+
+    if (kunlink(path) == -1)
+      res = -1;
+  }
+
+  if (SHOW_SWAPDEALLOC_LEAVE)
+    cprintf("Leaving swapdealloc.\n");
+
+  return res;
+}
+
+int swapread(struct proc *pr, char *buf, uint offset, uint size)
+{
+  if (SHOW_SWAPREAD_ENTER)
+    cprintf("Entering swapread.\n");
+
+  int fileno = offset / SWAPFILE_LIMIT;
+
+  if (fileno < 0 || fileno > MAX_SWAPFILES)
+    panic("offset too big!");
+
+  int infileoffset = offset % SWAPFILE_LIMIT;
+
+  pr->swapfile[fileno]->off = infileoffset;
+
+  if (SHOW_SWAPREAD_LEAVE)
+    cprintf("Leaving swapread.\n");
+
+  return fileread(pr->swapfile[fileno], buf, size);
+}
+
+int swapwrite(struct proc *pr, char *buf, uint offset, uint size)
+{
+  if (SHOW_SWAPWRITE_ENTER)
+    cprintf("Entering swapwrite.\n");
+
+  int fileno = offset / SWAPFILE_LIMIT;
+
+  if (fileno < 0 || fileno > MAX_SWAPFILES)
+    panic("offset too big!");
+
+  int infileoffset = offset % SWAPFILE_LIMIT;
+
+  pr->swapfile[fileno]->off = infileoffset;
+
+  if (SHOW_SWAPWRITE_LEAVE)
+    cprintf("Leaving swapwrite.\n");
+
+  return filewrite(pr->swapfile[fileno], buf, size);
 }

@@ -1,3 +1,9 @@
+/*
+*修改者：程嘉梁
+*修改日期：2018/05/06
+*修改内容：加入用户登录命令
+*/
+
 // init: The initial user-level program
 
 #include "types.h"
@@ -5,7 +11,7 @@
 #include "user.h"
 #include "fcntl.h"
 
-char *argv[] = { "sh", 0 };
+char *argv[] = { "login", 0 };
 
 int
 main(void)
@@ -20,15 +26,15 @@ main(void)
   dup(0);  // stderr
 
   for(;;){
-    printf(1, "init: starting sh\n");
+    printf(1, "Welcome to Xv6\n");
     pid = fork();
     if(pid < 0){
       printf(1, "init: fork failed\n");
       exit();
     }
     if(pid == 0){
-      exec("sh", argv);
-      printf(1, "init: exec sh failed\n");
+      exec("login", argv);
+      printf(1, "init: exec login failed\n");
       exit();
     }
     while((wpid=wait()) >= 0 && wpid != pid)
