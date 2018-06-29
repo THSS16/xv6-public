@@ -182,6 +182,9 @@ runcmd(struct cmd *cmd)
     {
         ncommand[i+1] = ecmd->argv[0][i];
     }
+//<<<<<<< final_shell
+//    exec(ncommand, ecmd->argv);
+//=======
     if (ecmd->argv[0][0] == 'b' && ecmd->argv[0][1] == 'g'){
       bg();
     }
@@ -191,6 +194,7 @@ runcmd(struct cmd *cmd)
     else{
       exec(ecmd->argv[0], ecmd->argv);
     }
+//>>>>>>> final_shell
     printf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
