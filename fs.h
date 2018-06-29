@@ -21,7 +21,7 @@ struct superblock {
   uint bmapstart;    // Block number of first free map block
 };
 
-#define NDIRECT 11//由于添加了ctime成员，所以NDIRECT--
+#define NDIRECT 10//由于添加了ctime成员，所以NDIRECT--
 #define NINDIRECT (BSIZE / sizeof(uint))
 #define NINDIRECT_DOUBLE (NINDIRECT * NINDIRECT)
 #define MAXFILE (NDIRECT + NINDIRECT + NINDIRECT_DOUBLE)
@@ -34,6 +34,7 @@ struct dinode {
   short nlink;          // Number of links to inode in file system
   uint size;            // Size of file (bytes)
   uint addrs[NDIRECT+1];   // Data block addresses
+  char showable;        // Whether can be showed in ls
   uint ctime;           //文件创建时间
 };
 

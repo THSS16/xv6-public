@@ -5,51 +5,6 @@
 #include "x86.h"
 
 char*
-strcpy(char *s, char *t)
-{
-  char *os;
-
-  os = s;
-  while((*s++ = *t++) != 0)
-    ;
-  return os;
-}
-
-int
-strcmp(const char *p, const char *q)
-{
-  while(*p && *p == *q)
-    p++, q++;
-  return (uchar)*p - (uchar)*q;
-}
-
-uint
-strlen(char *s)
-{
-  int n;
-
-  for(n = 0; s[n]; n++)
-    ;
-  return n;
-}
-
-void*
-memset(void *dst, int c, uint n)
-{
-  stosb(dst, c, n);
-  return dst;
-}
-
-char*
-strchr(const char *s, char c)
-{
-  for(; *s; s++)
-    if(*s == c)
-      return (char*)s;
-  return 0;
-}
-
-char*
 gets(char *buf, int max)
 {
   int i, cc;
@@ -68,7 +23,7 @@ gets(char *buf, int max)
 }
 
 char
-getc()
+getc_from_stdin()
 {
   int c;
   read(0, &c, 1);

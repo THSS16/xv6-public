@@ -29,9 +29,10 @@
 #define SYS_insertc     24
 #define SYS_setconsole  25
 #define SYS_shutdown    26
-#define SYS_lseek  	27
 #define SYS_gettimestamp 28
 #define SYS_getcwd  29
+#define SYS_hide   	45
+#define SYS_show   	46
 
 #define SYS_inittaskmgr  41
 #define SYS_closetaskmgr 42
@@ -41,3 +42,24 @@
 #define SYS_reparent 50
 #define SYS_getstate 51
 #define SYS_suspend 52
+#define SYS_gettime 47
+#define SYS_isatty 48
+#define SYS_lseek 49
+
+
+// Error results
+#define EPERM		 -1		/* Operation not permitted */
+#define ENOENT		 -2		/* No such file or directory */
+#define E2BIG		 -7		/* Argument list too long */
+#define EBADF		 -9		/* Bad file descriptor */
+#define ENOMEM		-12		/* Cannot allocate memory */
+#define EACCES		-13		/* Permission denied */
+#define EEXIST		-17		/* File exists */
+#define ENOTDIR		-20		/* Not a directory */
+#define EISDIR		-21		/* Is a directory */
+#define EINVAL		-22		/* Invalid argument */
+#define ENFILE		-23		/* Too many open files in system */
+#define EMFILE		-24		/* Too many open files */
+#define ENOTTY		-25		/* Inappropriate ioctl for device */
+#define EFBIG		-27		/* File too large */
+#define EPIPE		-32		/* Broken pipe */

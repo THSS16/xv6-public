@@ -175,15 +175,16 @@ int sys_nfpgs(void)
 int
 sys_createshm(void)
 {
-    int sig, bytes;
-    if(argint(0, &sig) < 0 || argint(1, &bytes) < 0)
+    int sig, bytes, type;
+    if(argint(0, &sig) < 0 || argint(1, &bytes) < 0 || argint(2, &type) < 0)
     {
         return 0;
     }
-    return createshm(sig,bytes);
+    return createshm(sig, bytes, type);
 }
 
-// return 1 when succeed, return 0 when fail.
+// decrease some sig counts in shmlist
+// return 1 when succeed, return 0 when delelte a sig, return -1 when fail.
 int
 sys_deleteshm(void)
 {
@@ -195,7 +196,8 @@ sys_deleteshm(void)
     return deleteshm(sig);
 }
 
-//return the number of characters actually written in
+// write data from wstr to shared pages with offset "offset"
+// return 0 when succeed and return -1 when failed
 int
 sys_writeshm(void)
 {
@@ -210,7 +212,7 @@ sys_writeshm(void)
     return writeshm(sig, str, num, offset);
 }
 
-// return the number of characters actually read from shmpages
+// return 0 when succeed and return -1 when failed
 int
 sys_readshm(void)
 {

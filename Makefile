@@ -79,13 +79,14 @@ AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
-CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -fno-omit-frame-pointer -std=gnu11
+INCLDIR = ./include
+CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -fno-omit-frame-pointer -nostdinc -I$(INCLDIR)
 #CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -fvar-tracking -fvar-tracking-assignments -O0 -g -Wall -MD -gdwarf-2 -m32 -Werror -fno-omit-frame-pointer
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
 # FreeBSD ld wants ``elf_i386_fbsd''
 LDFLAGS += -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
-LDUSER += --omagic --entry=main --section-start=.text=0x1000
+LDUSER += --omagic --entry=_start --section-start=.text=0x1000
 
 xv6.img: bootblock kernel fs.img
 	dd if=/dev/zero of=xv6.img count=10000
@@ -117,8 +118,10 @@ initcode: initcode.S
 	$(OBJCOPY) -S -O binary initcode.out initcode
 	$(OBJDUMP) -S initcode.o > initcode.asm
 
-kernel: $(OBJS) entry.o entryother initcode kernel.ld
-	$(LD) $(LDFLAGS) -T kernel.ld -o kernel entry.o $(OBJS) -b binary initcode entryother
+LUA = lua
+	
+kernel: $(OBJS) entry.o entryother initcode kernel.ld $(LUA)
+	$(LD) $(LDFLAGS) -T kernel.ld -o kernel entry.o $(OBJS) -b binary initcode entryother $(LUA)
 	$(OBJDUMP) -S kernel > kernel.asm
 	$(OBJDUMP) -t kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > kernel.sym
 
@@ -140,18 +143,34 @@ tags: $(OBJS) entryother.S _init
 vectors.S: vectors.pl
 	perl vectors.pl > vectors.S
 
-ULIB = ulib.o usys.o printf.o umalloc.o
+ULIB = ulib.o usys.o printf.o
+LIBC = libc/libc.a
+START = start.o
 
-_%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) $(LDUSER) -o $@ $^
+NEWLIBDIR = xv6-newlib
+LUADIR = lua-xv6
+GCCDIR = barebones-toolchain-i686-elf
+NEWLIBFLAGS = --target=i686-elf-xv6 CC_FOR_TARGET=i686-elf-gcc AS_FOR_TARGET=i686-elf-as LD_FOR_TARGET=i686-elf-ld AR_FOR_TARGET=i686-elf-ar RANLIB_FOR_TARGET=i686-elf-ranlib
+NEWLIBCS = $(NEWLIBDIR)/i686-elf-xv6/newlib/libc.a $(NEWLIBDIR)/i686-elf-xv6/newlib/libm.a $(NEWLIBDIR)/i686-elf-xv6/newlib/libg.a \
+	$(NEWLIBDIR)/i686-elf-xv6/newlib/crt0.o $(NEWLIBDIR)/i686-elf-xv6/libgloss/libnosys/libnosys.a $(NEWLIBDIR)/newlib/libc/include
+
+$(LIBC):
+	$(MAKE) -C ./libc all
+	
+$(LUA): $(NEWLIBCS)
+	cd $(GCCDIR); . ./setenv.sh; cd ..; \
+	$(MAKE) -C $(LUADIR) all
+	cp $(LUADIR)/$(LUA) ./$(LUA)
+
+$(NEWLIBCS):
+	cd $(GCCDIR); . ./setenv.sh; cd ..; \
+	cd $(NEWLIBDIR); ./configure $(NEWLIBFLAGS); cd ..; \
+	$(MAKE) -C $(NEWLIBDIR) all
+	
+_%: %.o $(ULIB) $(START) $(LIBC)
+	$(LD) $(LDFLAGS) $(LDUSER) -s -N -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
-
-_forktest: forktest.o $(ULIB)
-	# forktest has less library code linked in - needs to be small
-	# in order to be able to max out the proc table.
-	$(LD) $(LDFLAGS) $(LDUSER) -o _forktest forktest.o ulib.o usys.o
-	$(OBJDUMP) -S _forktest > forktest.asm
 
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall -o mkfs mkfs.c
@@ -189,8 +208,10 @@ UPROGS=\
 	_sagtest\
 	_pgswptest\
 	_shmtest\
+	_vmstat\
 	_find\
 	_bi\
+	_rename\
 	_vim\
 	_mv\
 	_touch\
@@ -204,9 +225,17 @@ UPROGS=\
 	_more\
 	_date\
 	_pwd\
+	_delete\
+	_refresh\
+	_showdeled\
+	_jerry\
+	_timetest\
+	_stdtests\
 
-fs.img: mkfs README $(UPROGS)
-	./mkfs fs.img README $(UPROGS)
+LUA_SCRIPTS=testmath.lua testos.lua testio.lua testtable.lua
+
+fs.img: mkfs README $(UPROGS) $(LUA_SCRIPTS)
+	./mkfs fs.img README $(UPROGS) $(LUA_SCRIPTS)
 
 -include *.d
 
@@ -215,7 +244,11 @@ clean:
 	*.o *.d *.asm *.sym vectors.S bootblock entryother \
 	initcode initcode.out kernel xv6.img fs.img kernelmemfs mkfs \
 	.gdbinit \
-	$(UPROGS)
+	$(UPROGS) $(LUA)
+	$(MAKE) -C ./libc clean
+	$(MAKE) -C $(LUADIR) clean
+	rm -rf $(NEWLIBDIR)/i686-elf-xv6
+	$(MAKE) -C $(NEWLIBDIR) distclean
 
 # make a printout
 FILES = $(shell grep -v '^\#' runoff.list)
@@ -274,10 +307,10 @@ EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
 	printf.c umalloc.c cowtest.c lalloctest.c npptest.c sagtest.c\
-	pgswptest.c shmtest.c\
+	pgswptest.c shmtest.c vmstat.c\
 	printf.c umalloc.c mv.c touch.c cp.c head.c tail.c splice.c\
-	history.c shutdown.c\
 	jobs.c autowriter.c recorder.c hello.c\
+	history.c shutdown.c delete.c refresh.c showdeled.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 
@@ -319,3 +352,4 @@ run:
 debug:
 	make clean
 	make qemu-nox-gdb
+

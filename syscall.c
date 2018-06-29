@@ -139,6 +139,12 @@ extern int sys_inittaskmgr(void);
 extern int sys_closetaskmgr(void);
 extern int sys_getprocinfo(void);
 extern int sys_updscrcont(void);
+extern int sys_hide(void);
+extern int sys_show(void);
+extern int sys_gettime(void);
+extern int sys_isatty(void);
+extern int sys_lseek(void);
+
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -174,13 +180,17 @@ static int (*syscalls[])(void) = {
 [SYS_clearc]        sys_clearc,
 [SYS_insertc]       sys_insertc,
 [SYS_shutdown]    sys_shutdown,
-[SYS_lseek]   sys_lseek,
 [SYS_gettimestamp]   sys_gettimestamp,
 [SYS_getcwd]    sys_getcwd,
 [SYS_inittaskmgr]   sys_inittaskmgr,
 [SYS_closetaskmgr]  sys_closetaskmgr,
 [SYS_getprocinfo]   sys_getprocinfo,
 [SYS_updscrcont]    sys_updscrcont,
+[SYS_hide]    sys_hide,
+[SYS_show]    sys_show,
+[SYS_gettime] sys_gettime,
+[SYS_isatty]  sys_isatty,
+[SYS_lseek]   sys_lseek,
 };
 
 void

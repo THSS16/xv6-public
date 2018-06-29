@@ -20,12 +20,9 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
-// <<<<<<< memorymanager
 #include "fcntl.h"
 #include "debugsw.h"
-// =======
 #include "date.h"
-// >>>>>>> final_shell
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
@@ -241,6 +238,7 @@ ialloc(uint dev, short type)
     if(dip->type == 0){  // a free inode
       memset(dip, 0, sizeof(*dip));
       dip->type = type;
+      dip->showable = O_SHOW;
       log_write(bp);   // mark it allocated on the disk
       brelse(bp);
       return iget(dev, inum);
@@ -267,6 +265,8 @@ iupdate(struct inode *ip)
   dip->minor = ip->minor;
   dip->nlink = ip->nlink;
   dip->size = ip->size;
+
+  dip->showable = ip->showable;
   dip->ctime = ip->ctime;//更新时间参数
   memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
   log_write(bp);
@@ -341,6 +341,7 @@ ilock(struct inode *ip)
     ip->minor = dip->minor;
     ip->nlink = dip->nlink;
     ip->size = dip->size;
+    ip->showable = dip->showable;
     ip->ctime = dip->ctime;//添加时间参数
     memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
     brelse(bp);
@@ -483,6 +484,7 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
+  st->showable = ip->showable;
   st->ctime = ip->ctime;//拷贝时间变量
 }
 
