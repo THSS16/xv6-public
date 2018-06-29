@@ -55,18 +55,6 @@ atoi(const char *s)
   return n;
 }
 
-void*
-memmove(void *vdst, void *vsrc, int n)
-{
-  char *dst, *src;
-
-  dst = vdst;
-  src = vsrc;
-  while(n-- > 0)
-    *dst++ = *src++;
-  return vdst;
-}
-
 int jobs_readline(int fd, char* line, int n)
 {  
   strcpy(line, "\0"); 
