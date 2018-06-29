@@ -104,7 +104,7 @@ runcmd(struct cmd *cmd)
     {
         ncommand[i+1] = ecmd->argv[0][i];
     }
-    exec(ecmd->argv[0], ecmd->argv);
+    exec(ncommand, ecmd->argv);
     printf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
