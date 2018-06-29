@@ -1,7 +1,7 @@
 #ifndef PVCWINDOW_H
 #define PVCWINDOW_H
 
-#include "PVCObject.h"
+#include "PVC.h"
 
 PHwnd pvcCreateWindow(char * title, PHwnd parent, int x, int y, int width, int height);
 
@@ -32,5 +32,10 @@ void pvcUpdate(PHwnd hwnd);
 void pvcPaintCloseBtn(PButtonData * data, PHdc hdc);
 
 void pvcPaintMinimizeBtn(PButtonData * data, PHdc hdc);
+
+void runApp(void * param);
+
+// Cmds without file name at beginning.
+void runAppWithCmds(void * param, char** cmds);
 
 #endif

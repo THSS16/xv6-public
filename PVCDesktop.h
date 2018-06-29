@@ -30,8 +30,6 @@ TaskBarData taskBarData;
 
 bool taskBarProc(PControl * taskBar, PMessage msg);
 
-void runApp(void * param);
-
 typedef struct PItemData
 {
   void * param;

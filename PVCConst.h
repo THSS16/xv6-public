@@ -8,6 +8,9 @@ typedef char bool;
 #define FINISH false
 #define TERMINATE (char)2
 
+#define MAX_ADDRESS_LEN 512
+#define MAX_ARGUMENT 5
+
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
