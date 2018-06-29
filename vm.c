@@ -1266,3 +1266,14 @@ int readshm(uint sig, char *rstr, uint num, uint offset)
       release(&kshmlock);
   return 0;
 }
+
+int getsharedpages(void)
+{
+  int pgnum = 0;
+  int i = 0;
+  for(;i<MAX_SHMNODE_NUM;i++)
+  {
+    pgnum += shmlist[i].pagenum;
+  }
+  return pgnum;
+}

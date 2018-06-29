@@ -39,6 +39,8 @@ int createshm(uint, uint, int);
 int deleteshm(uint);
 int readshm(uint, char*, uint, uint);
 int writeshm(uint, char*, uint, uint);
+int getsharedpages(void);
+void showproc(void);
 
 int setconsole(int, int, int, int, int);
 void clearc(void);

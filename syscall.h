@@ -45,7 +45,8 @@
 #define SYS_gettime 47
 #define SYS_isatty 48
 #define SYS_lseek 49
-
+#define SYS_getsharedpages 50
+#define SYS_showproc 51
 
 // Error results
 #define EPERM		 -1		/* Operation not permitted */

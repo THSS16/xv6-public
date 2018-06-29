@@ -127,6 +127,8 @@ extern int sys_writeshm(void);
 extern int sys_readshm(void);
 extern int sys_createshm(void);
 extern int sys_deleteshm(void);
+extern int sys_getsharedpages(void);
+extern int sys_showproc(void);
 
 extern int sys_setconsole(void);
 extern int sys_clearc(void);
@@ -191,6 +193,8 @@ static int (*syscalls[])(void) = {
 [SYS_gettime] sys_gettime,
 [SYS_isatty]  sys_isatty,
 [SYS_lseek]   sys_lseek,
+[SYS_getsharedpages] sys_getsharedpages,
+[SYS_showproc] sys_showproc
 };
 
 void

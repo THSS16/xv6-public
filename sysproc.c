@@ -227,6 +227,12 @@ sys_readshm(void)
     return readshm(sig, str, num, offset);
 }
 
+int
+sys_getsharedpages(void)
+{
+  return getsharedpages();
+}
+
 // Halt (shutdown) the system by sending a special signal to QEMU.
 // Based on: https://github.com/noah-mcaulay/XV6-Operating-System/blob/master/sysproc.c
 int
@@ -262,4 +268,10 @@ sys_gettimestamp(void)
     ret += (date.day - 1) * 86400;
     ret += (date.hour * 3600 + date.minute * 60 + date.second);
     return ret;
+}
+
+void
+sys_showproc(void)
+{
+  showproc();
 }

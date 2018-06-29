@@ -20,7 +20,7 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
-void
+void 
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
@@ -357,7 +357,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
-  
+
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
@@ -431,7 +431,7 @@ fork(void)
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
-    np->kstack = 0;
+    np->kstack = 0;  
     np->state = UNUSED;
     return -1;
   }
@@ -616,7 +616,7 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-
+    
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
@@ -892,4 +892,20 @@ getprocinfo(int *pid, char (*name)[16], int *state, uint *sz)
     sz[i] = p.sz;
   }
   return 0;
+}
+
+
+void
+showproc(void)
+{
+  cprintf("Process list:\n");
+  cprintf("Name\tHeap\tStack\t\n");
+  struct proc* p;
+  for(p=ptable.proc;p<&ptable.proc[NPROC];p++)
+  {
+    if(p->state==RUNNING || p->state==RUNNABLE)
+    {
+      cprintf("%s\t%d\t%d",p->name,p->sz,p->stack_size);
+    }
+  }
 }
